@@ -23,11 +23,15 @@ const ADMIN_KB_CATALOG_ROOT = {
   resize_keyboard: true,
 };
 
-/** Tanlangan kategoriya ichidagi mahsulotlar */
-const ADMIN_KB_CATEGORY = {
-  keyboard: [[{ text: '⬅️ Kategoriyalar' }], [{ text: "➕ Mahsulot qo'shish" }]],
-  resize_keyboard: true,
-};
+const REMOVE_REPLY_KEYBOARD = { remove_keyboard: true };
+
+async function hideReplyKeyboard(chatId) {
+  try {
+    await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
+  } catch (_) {
+    /* ignore */
+  }
+}
 
 function getAdminId() {
   const raw = process.env.ADMIN_CHAT_ID;
@@ -97,6 +101,12 @@ function cbDelCancel(pid) {
 /** Katalogda kategoriyani ochish (mahsulotlar ro'yxati) */
 function cbGotoCategory(cid) {
   return `adm_g_${cid}`;
+}
+/** Katalog ildiziga (kategoriyalar ro'yxati) */
+const CB_ADMIN_BACK_ROOT = 'adm_back_root';
+/** Shu kategoriyada mahsulot qo'shish */
+function cbAddProductInCategory(cid) {
+  return `adm_ap_${cid}`;
 }
 /** Mahsulot boshqaruv menyusi */
 function cbSelectProduct(pid) {
@@ -185,12 +195,16 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   const products = await Product.find({ category_id: categoryId }).sort({ createdAt: 1 }).lean();
   setState(userId, { type: 'catalog_view', categoryId: String(categoryId) });
 
+  const footerRows = [
+    [{ text: '⬅️ Kategoriyalar', callback_data: CB_ADMIN_BACK_ROOT }],
+    [{ text: "➕ Mahsulot qo'shish", callback_data: cbAddProductInCategory(String(categoryId)) }],
+  ];
+
   if (!products.length) {
-    await botInstance.sendMessage(
-      chatId,
-      `📁 ${cat.name_uz}\n\nBu kategoriyada mahsulot yo'q.`,
-      { reply_markup: ADMIN_KB_CATEGORY }
-    );
+    await hideReplyKeyboard(chatId);
+    await botInstance.sendMessage(chatId, `📁 ${cat.name_uz}\n\nBu kategoriyada mahsulot yo'q.`, {
+      reply_markup: { inline_keyboard: footerRows },
+    });
     return;
   }
 
@@ -204,26 +218,31 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   const keyboard = slice.map((p) => [
     { text: truncateButtonText(p.name_uz), callback_data: cbSelectProduct(String(p._id)) },
   ]);
+  keyboard.push(...footerRows);
 
+  await hideReplyKeyboard(chatId);
   await botInstance.sendMessage(chatId, text, { reply_markup: { inline_keyboard: keyboard } });
-  await botInstance.sendMessage(chatId, 'Kategoriya boshqaruvi:', { reply_markup: ADMIN_KB_CATEGORY });
 }
 
 /** Tanlangan mahsulot: tahrirlash / narx / rasm / o'chirish */
 async function sendProductAdminMenu(chatId, userId, productId) {
   if (!mongoose.isValidObjectId(productId)) {
-    await botInstance.sendMessage(chatId, "Noto'g'ri mahsulot.", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "Noto'g'ri mahsulot.", { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCatalogRoot(chatId, userId);
     return;
   }
   const p = await Product.findById(productId).lean();
   if (!p) {
-    await botInstance.sendMessage(chatId, 'Mahsulot topilmadi.', { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, 'Mahsulot topilmadi.', { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCatalogRoot(chatId, userId);
     return;
   }
   const cat = await Category.findById(p.category_id).lean();
   const pid = String(p._id);
   const cid = String(p.category_id);
   setState(userId, { type: 'catalog_view', categoryId: cid });
+
+  await hideReplyKeyboard(chatId);
 
   const mark = p.is_available !== false ? '✅ Sotuvda' : '❌ Sotuvda emas';
   const imgLine = p.image_url ? `\n🖼 ${p.image_url}` : "\n🖼 Rasm yo'q";
@@ -257,18 +276,18 @@ async function sendProductAdminMenu(chatId, userId, productId) {
   } else {
     await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
   }
-
-  await botInstance.sendMessage(chatId, 'Pastdagi tugmalar (kategoriya):', { reply_markup: ADMIN_KB_CATEGORY });
 }
 
 async function startAddProductForCategory(chatId, userId, categoryId) {
   if (!mongoose.isValidObjectId(categoryId)) {
-    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCatalogRoot(chatId, userId);
     return;
   }
   const cat = await Category.findById(categoryId).lean();
   if (!cat) {
-    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCatalogRoot(chatId, userId);
     return;
   }
   setState(userId, {
@@ -283,7 +302,7 @@ async function startAddProductForCategory(chatId, userId, categoryId) {
   await botInstance.sendMessage(
     chatId,
     `➕ Yangi mahsulot (${cat.name_uz})\n\nMahsulot nomini kiriting (o'zbekcha):`,
-    { reply_markup: ADMIN_KB_CATEGORY }
+    { reply_markup: REMOVE_REPLY_KEYBOARD }
   );
 }
 
@@ -326,6 +345,24 @@ async function handleAdminCallback(query) {
   const mDelConf = data.match(/^adm_dc_(.+)$/);
   const mDelCan = data.match(/^adm_dx_(.+)$/);
 
+  if (data === CB_ADMIN_BACK_ROOT) {
+    await answer();
+    await sendCatalogRoot(chatId, userId);
+    return true;
+  }
+
+  const mAddProd = data.match(/^adm_ap_(.+)$/);
+  if (mAddProd) {
+    const cid = mAddProd[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    await startAddProductForCategory(chatId, userId, cid);
+    return true;
+  }
+
   if (mGoto) {
     const cid = mGoto[1];
     if (!mongoose.isValidObjectId(cid)) {
@@ -367,7 +404,7 @@ async function handleAdminCallback(query) {
       categoryId: String(prod.category_id),
     });
     await answer();
-    await botInstance.sendMessage(chatId, "Yangi nom (O'zbekcha):", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "Yangi nom (O'zbekcha):", { reply_markup: REMOVE_REPLY_KEYBOARD });
     return true;
   }
 
@@ -389,7 +426,7 @@ async function handleAdminCallback(query) {
       categoryId: String(prod.category_id),
     });
     await answer();
-    await botInstance.sendMessage(chatId, 'Yangi nom (Ruscha):', { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, 'Yangi nom (Ruscha):', { reply_markup: REMOVE_REPLY_KEYBOARD });
     return true;
   }
 
@@ -412,7 +449,7 @@ async function handleAdminCallback(query) {
     });
     await answer();
     await botInstance.sendMessage(chatId, "Rasm URL (https://... yoki 'skip'):", {
-      reply_markup: ADMIN_KB_CATEGORY,
+      reply_markup: REMOVE_REPLY_KEYBOARD,
     });
     return true;
   }
@@ -428,7 +465,7 @@ async function handleAdminCallback(query) {
     setState(userId, { type: 'await_price', productId: pid, categoryIdReturn });
     await answer();
     await botInstance.sendMessage(chatId, "Yangi narxni kiriting (faqat raqam):", {
-      reply_markup: ADMIN_KB_CATEGORY,
+      reply_markup: REMOVE_REPLY_KEYBOARD,
     });
     return true;
   }
@@ -463,7 +500,7 @@ async function handleAdminCallback(query) {
     const catId = prod?.category_id ? String(prod.category_id) : null;
     await Product.findByIdAndDelete(pid);
     await answer("O'chirildi");
-    await botInstance.sendMessage(chatId, "✅ Mahsulot o'chirildi.", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "✅ Mahsulot o'chirildi.");
     clearAdminState(userId);
     if (catId) await sendCatalogCategoryView(chatId, userId, catId);
     else await sendCatalogRoot(chatId, userId);
@@ -474,7 +511,7 @@ async function handleAdminCallback(query) {
     const pid = mDelCan[1];
     await answer("Bekor qilindi");
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, "O'chirish bekor qilindi.", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "O'chirish bekor qilindi.");
     if (mongoose.isValidObjectId(pid)) await sendProductAdminMenu(chatId, userId, pid);
     else await sendCatalogRoot(chatId, userId);
     return true;
@@ -553,7 +590,7 @@ async function handleAdminMessage(msg) {
     const n = Number(text.replace(/\s/g, '').replace(/,/g, ''));
     if (!Number.isFinite(n) || n < 0) {
       clearAdminState(userId);
-      await botInstance.sendMessage(chatId, "❌ Noto'g'ri narx.", { reply_markup: ADMIN_KB_CATEGORY });
+      await botInstance.sendMessage(chatId, "❌ Noto'g'ri narx.", { reply_markup: REMOVE_REPLY_KEYBOARD });
       if (st.productId) await sendProductAdminMenu(chatId, userId, st.productId);
       else if (st.categoryIdReturn) await sendCatalogCategoryView(chatId, userId, st.categoryIdReturn);
       else await sendCatalogRoot(chatId, userId);
@@ -561,7 +598,7 @@ async function handleAdminMessage(msg) {
     }
     await Product.findByIdAndUpdate(st.productId, { price: n });
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, `✅ Narx yangilandi: ${n} so'm`, { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, `✅ Narx yangilandi: ${n} so'm`, { reply_markup: REMOVE_REPLY_KEYBOARD });
     if (st.productId) await sendProductAdminMenu(chatId, userId, st.productId);
     else if (st.categoryIdReturn) await sendCatalogCategoryView(chatId, userId, st.categoryIdReturn);
     else await sendCatalogRoot(chatId, userId);
@@ -570,26 +607,30 @@ async function handleAdminMessage(msg) {
 
   if (st.type === 'edit_product_name_uz') {
     if (!text) {
-      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", { reply_markup: ADMIN_KB_CATEGORY });
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+        reply_markup: REMOVE_REPLY_KEYBOARD,
+      });
       return true;
     }
     const pid = st.productId;
     await Product.findByIdAndUpdate(pid, { name_uz: text });
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, "✅ Nom (O'zbekcha) yangilandi.", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "✅ Nom (O'zbekcha) yangilandi.", { reply_markup: REMOVE_REPLY_KEYBOARD });
     await sendProductAdminMenu(chatId, userId, pid);
     return true;
   }
 
   if (st.type === 'edit_product_name_ru') {
     if (!text) {
-      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", { reply_markup: ADMIN_KB_CATEGORY });
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+        reply_markup: REMOVE_REPLY_KEYBOARD,
+      });
       return true;
     }
     const pid = st.productId;
     await Product.findByIdAndUpdate(pid, { name_ru: text });
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, '✅ Nom (Ruscha) yangilandi.', { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, '✅ Nom (Ruscha) yangilandi.', { reply_markup: REMOVE_REPLY_KEYBOARD });
     await sendProductAdminMenu(chatId, userId, pid);
     return true;
   }
@@ -600,14 +641,14 @@ async function handleAdminMessage(msg) {
       await botInstance.sendMessage(
         chatId,
         "URL http/https bilan boshlanishi kerak yoki 'skip' yozing.",
-        { reply_markup: ADMIN_KB_CATEGORY }
+        { reply_markup: REMOVE_REPLY_KEYBOARD }
       );
       return true;
     }
     const pid = st.productId;
     await Product.findByIdAndUpdate(pid, { image_url: url });
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, "✅ Rasm yangilandi.", { reply_markup: ADMIN_KB_CATEGORY });
+    await botInstance.sendMessage(chatId, "✅ Rasm yangilandi.", { reply_markup: REMOVE_REPLY_KEYBOARD });
     await sendProductAdminMenu(chatId, userId, pid);
     return true;
   }
@@ -615,23 +656,27 @@ async function handleAdminMessage(msg) {
   if (st.type === 'add_product') {
     if (st.step === 'name_uz') {
       if (!text) {
-        await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.");
+        await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+          reply_markup: REMOVE_REPLY_KEYBOARD,
+        });
         return true;
       }
       setState(userId, { ...st, step: 'name_ru', name_uz: text });
       await botInstance.sendMessage(chatId, 'Mahsulot nomini kiriting (ruscha):', {
-        reply_markup: ADMIN_KB_CATEGORY,
+        reply_markup: REMOVE_REPLY_KEYBOARD,
       });
       return true;
     }
     if (st.step === 'name_ru') {
       if (!text) {
-        await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.");
+        await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+          reply_markup: REMOVE_REPLY_KEYBOARD,
+        });
         return true;
       }
       setState(userId, { ...st, step: 'price', name_ru: text });
       await botInstance.sendMessage(chatId, "Narxini kiriting (so'm, faqat raqam):", {
-        reply_markup: ADMIN_KB_CATEGORY,
+        reply_markup: REMOVE_REPLY_KEYBOARD,
       });
       return true;
     }
@@ -645,7 +690,7 @@ async function handleAdminMessage(msg) {
       await botInstance.sendMessage(
         chatId,
         "Rasm URL ni kiriting (yoki 'skip' yozing):",
-        { reply_markup: ADMIN_KB_CATEGORY }
+        { reply_markup: REMOVE_REPLY_KEYBOARD }
       );
       return true;
     }
@@ -669,7 +714,7 @@ async function handleAdminMessage(msg) {
       });
       const cid = st.categoryId;
       clearAdminState(userId);
-      await botInstance.sendMessage(chatId, "✅ Mahsulot qo'shildi!", { reply_markup: ADMIN_KB_CATEGORY });
+      await botInstance.sendMessage(chatId, "✅ Mahsulot qo'shildi!");
       await sendCatalogCategoryView(chatId, userId, cid);
       return true;
     }
@@ -714,9 +759,9 @@ async function handleAdminMessage(msg) {
       st.type === 'edit_product_name_uz' ||
       st.type === 'edit_product_name_ru' ||
       st.type === 'await_product_image';
-    await botInstance.sendMessage(chatId, "Tushunarsiz buyruq. ⬅️ Asosiy menyu yoki ⬅️ Kategoriyalar.", {
+    await botInstance.sendMessage(chatId, "Tushunarsiz buyruq. Inline tugmalar yoki 📦 Katalog orqali davom eting.", {
       reply_markup: kbCategoryFlow
-        ? ADMIN_KB_CATEGORY
+        ? REMOVE_REPLY_KEYBOARD
         : st.type === 'catalog_root' || st.type === 'add_category'
           ? ADMIN_KB_CATALOG_ROOT
           : ADMIN_KEYBOARD_MAIN,
