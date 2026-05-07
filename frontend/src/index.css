@@ -7,10 +7,24 @@
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    @apply m-0 min-h-[100dvh] bg-stone-50 text-stone-900 antialiased;
+    @apply m-0 min-h-[100dvh] bg-surface text-ink antialiased;
   }
   #root {
-    @apply min-h-[100dvh] max-w-lg mx-auto;
+    @apply min-h-[100dvh] max-w-[480px] mx-auto w-full overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-2xl bg-primary py-3.5 font-bold text-white shadow-md transition hover:bg-primarydark active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100;
+  }
+  .btn-ghost {
+    @apply rounded-full border border-stone-200 bg-white text-ink shadow-sm transition hover:bg-surface active:scale-95;
+  }
+  /* Matn belgilari (− + ←) dumaloq tugmada pastga siljishini tuzatish */
+  .btn-icon-inner {
+    @apply flex items-center justify-center leading-none;
+    transform: translateY(-0.08em);
   }
 }
 

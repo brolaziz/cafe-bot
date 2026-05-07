@@ -1,23 +1,19 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-export const api = axios.create({
-  baseURL,
-  headers: { 'Content-Type': 'application/json' },
-});
+export const fetchCategories = async () => {
+  console.log('Fetching from:', BASE_URL + '/api/categories');
+  const res = await axios.get(`${BASE_URL}/api/categories`);
+  return res.data;
+};
 
-export async function fetchCategories() {
-  const { data } = await api.get('/api/categories');
-  return data;
-}
+export const fetchProducts = async (categoryId) => {
+  const res = await axios.get(`${BASE_URL}/api/products/${categoryId}`);
+  return res.data;
+};
 
-export async function fetchProducts(categoryId) {
-  const { data } = await api.get(`/api/products/${categoryId}`);
-  return data;
-}
-
-export async function createOrder(payload) {
-  const { data } = await api.post('/api/orders', payload);
-  return data;
-}
+export const createOrder = async (orderData) => {
+  const res = await axios.post(`${BASE_URL}/api/orders`, orderData);
+  return res.data;
+};

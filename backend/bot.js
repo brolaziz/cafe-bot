@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Order = require('./models/Order');
 const Category = require('./models/Category');
 const Product = require('./models/Product');
+const { deleteOldOrders, ORDER_RETENTION_DAYS } = require('./orderCleanup');
 
 let botInstance = null;
 
@@ -14,6 +15,7 @@ const ADMIN_KEYBOARD = {
   keyboard: [
     [{ text: '📋 Mahsulotlar' }, { text: "➕ Mahsulot qo'shish" }],
     [{ text: '📁 Kategoriyalar' }, { text: "➕ Kategoriya qo'shish" }],
+    [{ text: '🗑 Tozalash' }],
   ],
   resize_keyboard: true,
 };
@@ -272,6 +274,16 @@ async function handleAdminMessage(msg) {
 
   const text = msg.text != null ? String(msg.text).trim() : '';
   const st = getState(userId);
+
+  if (text === '/cleanup' || text === '🗑 Tozalash') {
+    const deletedCount = await deleteOldOrders();
+    await botInstance.sendMessage(
+      chatId,
+      `🗑 ${ORDER_RETENTION_DAYS} kundan eski buyurtmalar o'chirildi: ${deletedCount} ta`,
+      { reply_markup: ADMIN_KEYBOARD }
+    );
+    return true;
+  }
 
   if (st.type === 'await_price') {
     const n = Number(text.replace(/\s/g, '').replace(/,/g, ''));

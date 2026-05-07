@@ -1,93 +1,114 @@
+import AppHeader, { HeaderIconButton } from '../components/AppHeader';
+
 function lineTotal(line) {
   return line.price * line.qty;
+}
+
+function shouldUseImagePlaceholder(url) {
+  const u = url?.trim().toLowerCase() ?? '';
+  if (!u) return true;
+  return u.includes('example.com');
 }
 
 export default function CartPage({ cart, onBack, onCheckout, onChangeQty, onRemove }) {
   const total = cart.reduce((s, line) => s + lineTotal(line), 0);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-stone-50">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-stone-200/80 bg-stone-50/95 px-3 py-3 backdrop-blur">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full p-2 text-stone-700 ring-1 ring-stone-200 active:bg-stone-100"
-          aria-label="Orqaga"
-        >
-          ←
-        </button>
-        <h1 className="text-lg font-bold text-stone-900">Savat</h1>
-      </header>
+    <div className="flex min-h-[100dvh] flex-col bg-surface">
+      <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
 
       {cart.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-stone-600">Savat bo'sh.</p>
-          <button type="button" onClick={onBack} className="rounded-full bg-primary px-6 py-3 font-semibold text-white shadow-md">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-card text-5xl shadow-card ring-1 ring-black/[0.06]">
+            🛒
+          </div>
+          <p className="text-base font-semibold text-muted">Savat bo'sh.</p>
+          <button type="button" onClick={onBack} className="btn-primary px-10">
             Menyuga qaytish
           </button>
         </div>
       ) : (
         <>
-          <ul className="flex-1 divide-y divide-stone-200 px-3">
-            {cart.map((line) => (
-              <li key={line.productId} className="flex gap-3 py-4">
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-stone-100 ring-1 ring-stone-200">
-                  {line.image_url?.trim() ? (
-                    <img src={line.image_url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-2xl text-stone-300">☕</div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-stone-900">{line.name_uz}</p>
-                  <p className="text-sm text-stone-500">{line.price?.toLocaleString('uz-UZ')} so'm / dona</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="flex items-center rounded-full bg-white ring-1 ring-stone-200">
-                      <button
-                        type="button"
-                        className="px-3 py-1.5 text-lg font-bold text-stone-700"
-                        onClick={() => onChangeQty(line.productId, line.qty - 1)}
-                        aria-label="Kamaytirish"
-                      >
-                        −
-                      </button>
-                      <span className="min-w-8 text-center text-sm font-semibold">{line.qty}</span>
-                      <button
-                        type="button"
-                        className="px-3 py-1.5 text-lg font-bold text-primary"
-                        onClick={() => onChangeQty(line.productId, line.qty + 1)}
-                        aria-label="Ko'paytirish"
-                      >
-                        +
-                      </button>
+          <div className="px-4 pt-3">
+            <h2 className="text-xl font-bold text-ink">Savat</h2>
+            <p className="text-sm text-muted">{cart.length} turdagi mahsulot</p>
+          </div>
+
+          <ul className="flex-1 space-y-3 px-4 py-4">
+            {cart.map((line) => {
+              const usePlaceholder = shouldUseImagePlaceholder(line.image_url);
+              return (
+                <li
+                  key={line.productId}
+                  className="flex overflow-hidden rounded-2xl shadow-card ring-1 ring-black/[0.05] transition hover:shadow-card-hover"
+                >
+                  <div
+                    className="w-2 shrink-0 bg-gradient-to-b from-red-200/90 to-red-100/80"
+                    aria-hidden
+                  />
+                  <div className="flex min-w-0 flex-1 gap-3 bg-card p-3">
+                    <div className="h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-xl bg-surface ring-1 ring-stone-100">
+                      {!usePlaceholder ? (
+                        <img src={line.image_url.trim()} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/15 to-primarydark/10 text-2xl text-primary/40">
+                          ☕
+                        </div>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(line.productId)}
-                      className="ml-auto text-sm font-medium text-red-600"
-                    >
-                      O'chirish
-                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-ink">{line.name_uz}</p>
+                      <p className="text-xs font-medium text-muted">
+                        {line.price?.toLocaleString('uz-UZ')} so'm / dona
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 bg-surface text-lg font-bold leading-none text-ink transition hover:bg-white active:scale-90"
+                            onClick={() => onChangeQty(line.productId, line.qty - 1)}
+                            aria-label="Kamaytirish"
+                          >
+                            <span className="btn-icon-inner h-5 w-5">−</span>
+                          </button>
+                          <span className="min-w-8 text-center text-sm font-bold text-ink">{line.qty}</span>
+                          <button
+                            type="button"
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/40 bg-primary text-lg font-bold leading-none text-white transition hover:bg-primarydark active:scale-90"
+                            onClick={() => onChangeQty(line.productId, line.qty + 1)}
+                            aria-label="Ko'paytirish"
+                          >
+                            <span className="btn-icon-inner h-5 w-5">+</span>
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onRemove(line.productId)}
+                          className="text-xs font-bold text-red-600 underline-offset-2 hover:underline"
+                        >
+                          O'chirish
+                        </button>
+                      </div>
+                    </div>
+                    <div className="shrink-0 self-start text-right">
+                      <p className="text-sm font-extrabold text-primary">{lineTotal(line).toLocaleString('uz-UZ')}</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">so'm</p>
+                    </div>
                   </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-stone-900">{lineTotal(line).toLocaleString('uz-UZ')}</p>
-                  <p className="text-xs text-stone-500">so'm</p>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
 
-          <div className="sticky bottom-0 border-t border-stone-200 bg-stone-50/95 px-4 py-4 backdrop-blur">
+          <div className="sticky bottom-0 z-20 border-t border-stone-200/80 bg-card/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-stone-600">Jami</span>
-              <span className="text-xl font-bold text-primary">{total.toLocaleString('uz-UZ')} so'm</span>
+              <span className="text-sm font-semibold text-muted">Jami</span>
+              <span className="text-2xl font-extrabold tracking-tight text-ink">
+                {total.toLocaleString('uz-UZ')}{' '}
+                <span className="text-base font-bold text-muted">so'm</span>
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={onCheckout}
-              className="w-full rounded-2xl bg-primary py-3.5 text-center text-base font-bold text-white shadow-lg shadow-primary/25 active:scale-[0.99]"
-            >
+            <button type="button" onClick={onCheckout} className="btn-primary w-full">
               Buyurtma berish
             </button>
           </div>

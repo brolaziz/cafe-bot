@@ -5,8 +5,10 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const cron = require('node-cron');
 const { connectDb } = require('./db');
 const { initBot } = require('./bot');
+const { deleteOldOrders } = require('./orderCleanup');
 const menuRoutes = require('./routes/menu');
 const orderRoutes = require('./routes/orders');
 
@@ -50,6 +52,16 @@ async function start() {
   try {
     await connectDb();
     initBot();
+
+    cron.schedule('0 0 * * *', async () => {
+      try {
+        const deletedCount = await deleteOldOrders();
+        console.log(`Auto-cleanup: ${deletedCount} old orders deleted`);
+      } catch (err) {
+        console.error('Auto-cleanup failed:', err);
+      }
+    });
+
     app.listen(PORT, () => {
       console.log(`Server listening on http://localhost:${PORT}`);
     });

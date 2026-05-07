@@ -69,12 +69,14 @@ export default function App() {
   const tgUser = getTelegramUser();
 
   return (
-    <>
+    <div key={page} className="min-h-[100dvh] animate-page-slide">
       {page === 'menu' && (
         <MenuPage
+          cart={cart}
           cartCount={cartCount}
           onOpenCart={() => setPage('cart')}
           onAddToCart={addToCart}
+          onChangeQty={changeQty}
         />
       )}
       {page === 'cart' && (
@@ -94,6 +96,6 @@ export default function App() {
           onSuccess={handleOrderSuccess}
         />
       )}
-    </>
+    </div>
   );
 }
