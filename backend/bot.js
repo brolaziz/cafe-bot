@@ -25,32 +25,18 @@ const ADMIN_KB_CATALOG_ROOT = {
 
 const REMOVE_REPLY_KEYBOARD = { remove_keyboard: true };
 
-/**
- * Reply klaviaturani alohida xabar bilan yechib, keyin asosiy matn + inline tugmalar yuboradi.
- * Telegramda remove_keyboard qo'yilgan xabarga editMessageReplyMarkup bilan inline qo'shib bo'lmaydi —
- * shuning uchun ikki xabar ishlatiladi (tugmalar yo'qolmasligi uchun).
- */
-async function sendStripKbThenInline(chatId, text, inlineKeyboard) {
+/** Reply menyuni yechish — xabar chatda qolmaydi (darhol o'chiriladi). */
+async function hideReplyKeyboardEphemeral(chatId) {
   try {
-    await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
+    const sent = await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
+    try {
+      await botInstance.deleteMessage(chatId, sent.message_id);
+    } catch (_) {
+      /* ignore */
+    }
   } catch (_) {
     /* ignore */
   }
-  return botInstance.sendMessage(chatId, text, {
-    reply_markup: { inline_keyboard: inlineKeyboard },
-  });
-}
-
-async function sendPhotoStripKbThenInline(chatId, photoUrl, caption, inlineKeyboard) {
-  try {
-    await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
-  } catch (_) {
-    /* ignore */
-  }
-  return botInstance.sendPhoto(chatId, photoUrl, {
-    caption,
-    reply_markup: { inline_keyboard: inlineKeyboard },
-  });
 }
 
 function getAdminId() {
@@ -198,7 +184,10 @@ async function sendCatalogRoot(chatId, userId) {
   const rows = cats.map((c) => [{ text: c.name_uz, callback_data: cbGotoCategory(String(c._id)) }]);
   rows.push([{ text: '⬅️ Asosiy menyu', callback_data: CB_ADMIN_MAIN_MENU }]);
   rows.push([{ text: "➕ Kategoriya qo'shish", callback_data: CB_ADMIN_NEW_CATEGORY }]);
-  await sendStripKbThenInline(chatId, '📦 Katalog — kategoriyani tanlang:', rows);
+  await hideReplyKeyboardEphemeral(chatId);
+  await botInstance.sendMessage(chatId, '📦 Katalog — kategoriyani tanlang:', {
+    reply_markup: { inline_keyboard: rows },
+  });
 }
 
 /** Bitta kategoriya ichidagi mahsulotlar (nom bo'yicha tugmalar) */
@@ -222,11 +211,9 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   ];
 
   if (!products.length) {
-    await sendStripKbThenInline(
-      chatId,
-      `📁 ${cat.name_uz}\n\nBu kategoriyada mahsulot yo'q.`,
-      footerRows
-    );
+    await botInstance.sendMessage(chatId, `📁 ${cat.name_uz}\n\nBu kategoriyada mahsulot yo'q.`, {
+      reply_markup: { inline_keyboard: footerRows },
+    });
     return;
   }
 
@@ -242,7 +229,7 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   ]);
   keyboard.push(...footerRows);
 
-  await sendStripKbThenInline(chatId, text, keyboard);
+  await botInstance.sendMessage(chatId, text, { reply_markup: { inline_keyboard: keyboard } });
 }
 
 /** Tanlangan mahsulot: tahrirlash / narx / rasm / o'chirish */
@@ -286,16 +273,17 @@ async function sendProductAdminMenu(chatId, userId, productId) {
 
   const header = `📂 ${catLine}\n\n`;
 
-  const inlineKb = reply_markup.inline_keyboard;
-
   if (p.image_url && /^https?:\/\//i.test(String(p.image_url).trim())) {
     try {
-      await sendPhotoStripKbThenInline(chatId, String(p.image_url).trim(), `${header}${caption}`, inlineKb);
+      await botInstance.sendPhoto(chatId, String(p.image_url).trim(), {
+        caption: `${header}${caption}`,
+        reply_markup,
+      });
     } catch (_) {
-      await sendStripKbThenInline(chatId, `${header}${caption}`, inlineKb);
+      await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
     }
   } else {
-    await sendStripKbThenInline(chatId, `${header}${caption}`, inlineKb);
+    await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
   }
 }
 
