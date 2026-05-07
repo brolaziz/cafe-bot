@@ -179,16 +179,19 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
     const mark = p.is_available !== false ? '✅' : '❌';
     return `${i + 1}. ${p.name_uz} - ${p.price} so'm ${mark}`;
   });
-  let text = `📁 ${cat.name_uz}\n\n${lines.join('\n')}`;
+  let text = `📁 ${cat.name_uz}\n\n${lines.join('\n')}\n\nHar bir qatordagi tugmalar shu tartib raqamidagi mahsulotga tegishli.`;
   if (products.length > maxProducts) {
     text += `\n\n... yana ${products.length - maxProducts} ta`;
   }
   if (text.length > 3800) text = `${text.slice(0, 3770)}…`;
 
-  const keyboard = slice.map((p) => [
-    { text: '✏️ Narx', callback_data: cbPrice(String(p._id)) },
-    { text: "🚫 O'chirish", callback_data: cbDelAsk(String(p._id)) },
-  ]);
+  const keyboard = slice.map((p, i) => {
+    const n = i + 1;
+    return [
+      { text: `${n}. ✏️ Narx`, callback_data: cbPrice(String(p._id)) },
+      { text: `${n}. 🚫 O'chirish`, callback_data: cbDelAsk(String(p._id)) },
+    ];
+  });
 
   await botInstance.sendMessage(chatId, text, { reply_markup: { inline_keyboard: keyboard } });
   await botInstance.sendMessage(chatId, 'Kategoriya boshqaruvi:', { reply_markup: ADMIN_KB_CATEGORY });
