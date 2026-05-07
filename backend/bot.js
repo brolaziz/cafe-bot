@@ -89,15 +89,22 @@ function cbPickCat(cid) {
   return `adm_c_${cid}`;
 }
 
+function getWebAppUrlFromEnv() {
+  const keys = ['WEB_APP_URL', 'TELEGRAM_WEB_APP_URL', 'MINI_APP_URL', 'PUBLIC_WEB_APP_URL'];
+  for (const key of keys) {
+    const v = process.env[key];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  return '';
+}
+
 async function handleStart(msg) {
   if (!botInstance || !msg.chat?.id) return;
   const chatId = msg.chat.id;
   const name = (msg.from?.first_name && String(msg.from.first_name).trim()) || 'Mehmon';
-  const webAppUrl = process.env.WEB_APP_URL && String(process.env.WEB_APP_URL).trim();
+  const webAppUrl = getWebAppUrlFromEnv();
 
-  const hello =
-    `Assalomu alaykum, ${name}! 👋\n\n` +
-    "Cafe botiga xush kelibsiz. Menyuni ochib, taomlardan buyurtma bering.";
+  const hello = `Assalomu alaykum, ${name}!`;
 
   if (webAppUrl) {
     await botInstance.sendMessage(chatId, hello, {
@@ -105,12 +112,13 @@ async function handleStart(msg) {
         inline_keyboard: [[{ text: '📱 Menyuni ochish', web_app: { url: webAppUrl } }]],
       },
     });
-  } else {
-    await botInstance.sendMessage(
-      chatId,
-      `${hello}\n\n⚠️ WEB_APP_URL sozlanmagan — tugma chiqishi uchun .env ga HTTPS manzilini qo'shing (BotFather → Bot → Configure Mini App).`
-    );
+    return;
   }
+
+  await botInstance.sendMessage(
+    chatId,
+    `${hello}\n\nBuyurtma berish uchun Telegram menyusidagi «Web App» / «Mini App» tugmasidan foydalaning yoki backend .env da WEB_APP_URL ni HTTPS manzil bilan to'ldiring.`
+  );
 }
 
 async function sendAdminMenu(chatId) {
