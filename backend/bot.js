@@ -518,10 +518,20 @@ async function handleAdminCallback(query) {
     const catId = prod?.category_id ? String(prod.category_id) : null;
     await Product.findByIdAndDelete(pid);
     await answer("O'chirildi");
-    await botInstance.sendMessage(chatId, "✅ Mahsulot o'chirildi.");
+    let notice = "✅ Mahsulot o'chirildi.";
+    let categoryRemoved = false;
+    if (catId && mongoose.isValidObjectId(catId)) {
+      const remaining = await Product.countDocuments({ category_id: catId });
+      if (remaining === 0) {
+        await Category.findByIdAndDelete(catId);
+        categoryRemoved = true;
+        notice += "\n\n📁 Bu kategoriyada mahsulot qolmagan — kategoriya ham o'chirildi.";
+      }
+    }
+    await botInstance.sendMessage(chatId, notice);
     clearAdminState(userId);
-    if (catId) await sendCatalogCategoryView(chatId, userId, catId);
-    else await sendCatalogRoot(chatId, userId);
+    if (!catId || categoryRemoved) await sendCatalogRoot(chatId, userId);
+    else await sendCatalogCategoryView(chatId, userId, catId);
     return true;
   }
 
