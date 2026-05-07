@@ -26,28 +26,31 @@ const ADMIN_KB_CATALOG_ROOT = {
 const REMOVE_REPLY_KEYBOARD = { remove_keyboard: true };
 
 /**
- * Reply klaviaturani yechib, bir xabarda inline tugmalarni edit orqali qo'shadi
- * (oldingi send + delete + send o'rniga 2 ta API chaqiruv).
+ * Reply klaviaturani alohida xabar bilan yechib, keyin asosiy matn + inline tugmalar yuboradi.
+ * Telegramda remove_keyboard qo'yilgan xabarga editMessageReplyMarkup bilan inline qo'shib bo'lmaydi —
+ * shuning uchun ikki xabar ishlatiladi (tugmalar yo'qolmasligi uchun).
  */
 async function sendStripKbThenInline(chatId, text, inlineKeyboard) {
-  const sent = await botInstance.sendMessage(chatId, text, { reply_markup: REMOVE_REPLY_KEYBOARD });
-  await botInstance.editMessageReplyMarkup(
-    { inline_keyboard: inlineKeyboard },
-    { chat_id: chatId, message_id: sent.message_id }
-  );
-  return sent;
+  try {
+    await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
+  } catch (_) {
+    /* ignore */
+  }
+  return botInstance.sendMessage(chatId, text, {
+    reply_markup: { inline_keyboard: inlineKeyboard },
+  });
 }
 
 async function sendPhotoStripKbThenInline(chatId, photoUrl, caption, inlineKeyboard) {
-  const sent = await botInstance.sendPhoto(chatId, photoUrl, {
+  try {
+    await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
+  } catch (_) {
+    /* ignore */
+  }
+  return botInstance.sendPhoto(chatId, photoUrl, {
     caption,
-    reply_markup: REMOVE_REPLY_KEYBOARD,
+    reply_markup: { inline_keyboard: inlineKeyboard },
   });
-  await botInstance.editMessageReplyMarkup(
-    { inline_keyboard: inlineKeyboard },
-    { chat_id: chatId, message_id: sent.message_id }
-  );
-  return sent;
 }
 
 function getAdminId() {
