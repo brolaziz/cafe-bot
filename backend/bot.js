@@ -94,10 +94,31 @@ function cbDelConfirm(pid) {
 function cbDelCancel(pid) {
   return `adm_dx_${pid}`;
 }
-/** Katalogda kategoriyani ochish (mahsulotlar) */
+/** Katalogda kategoriyani ochish (mahsulotlar ro'yxati) */
 function cbGotoCategory(cid) {
   return `adm_g_${cid}`;
 }
+/** Mahsulot boshqaruv menyusi */
+function cbSelectProduct(pid) {
+  return `adm_s_${pid}`;
+}
+function cbEditNameUz(pid) {
+  return `adm_eu_${pid}`;
+}
+function cbEditNameRu(pid) {
+  return `adm_er_${pid}`;
+}
+function cbEditImage(pid) {
+  return `adm_im_${pid}`;
+}
+
+/** Telegram inline tugma matni ≤64 belgi */
+function truncateButtonText(label, maxLen = 64) {
+  const s = String(label ?? '').trim() || '—';
+  if (s.length <= maxLen) return s;
+  return `${s.slice(0, maxLen - 1)}…`;
+}
+
 function getWebAppUrlFromEnv() {
   const keys = ['WEB_APP_URL', 'TELEGRAM_WEB_APP_URL', 'MINI_APP_URL', 'PUBLIC_WEB_APP_URL'];
   for (const key of keys) {
@@ -149,7 +170,7 @@ async function sendCatalogRoot(chatId, userId) {
   await botInstance.sendMessage(chatId, 'Pastdagi tugmalar:', { reply_markup: ADMIN_KB_CATALOG_ROOT });
 }
 
-/** Bitta kategoriya ichidagi mahsulotlar */
+/** Bitta kategoriya ichidagi mahsulotlar (nom bo'yicha tugmalar) */
 async function sendCatalogCategoryView(chatId, userId, categoryId) {
   if (!mongoose.isValidObjectId(categoryId)) {
     await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
@@ -173,28 +194,71 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
     return;
   }
 
-  const maxProducts = 35;
+  const maxProducts = 40;
   const slice = products.slice(0, maxProducts);
-  const lines = slice.map((p, i) => {
-    const mark = p.is_available !== false ? '✅' : '❌';
-    return `${i + 1}. ${p.name_uz} - ${p.price} so'm ${mark}`;
-  });
-  let text = `📁 ${cat.name_uz}\n\n${lines.join('\n')}\n\nHar bir qatordagi tugmalar shu tartib raqamidagi mahsulotga tegishli.`;
+  let text = `📁 ${cat.name_uz}\n\n${slice.length} ta mahsulot. Boshqarish uchun nomini bosing:`;
   if (products.length > maxProducts) {
-    text += `\n\n... yana ${products.length - maxProducts} ta`;
+    text += `\n\n(yana ${products.length - maxProducts} ta — keyinroq qo'shiladi)`;
   }
-  if (text.length > 3800) text = `${text.slice(0, 3770)}…`;
 
-  const keyboard = slice.map((p, i) => {
-    const n = i + 1;
-    return [
-      { text: `${n}. ✏️ Narx`, callback_data: cbPrice(String(p._id)) },
-      { text: `${n}. 🚫 O'chirish`, callback_data: cbDelAsk(String(p._id)) },
-    ];
-  });
+  const keyboard = slice.map((p) => [
+    { text: truncateButtonText(p.name_uz), callback_data: cbSelectProduct(String(p._id)) },
+  ]);
 
   await botInstance.sendMessage(chatId, text, { reply_markup: { inline_keyboard: keyboard } });
   await botInstance.sendMessage(chatId, 'Kategoriya boshqaruvi:', { reply_markup: ADMIN_KB_CATEGORY });
+}
+
+/** Tanlangan mahsulot: tahrirlash / narx / rasm / o'chirish */
+async function sendProductAdminMenu(chatId, userId, productId) {
+  if (!mongoose.isValidObjectId(productId)) {
+    await botInstance.sendMessage(chatId, "Noto'g'ri mahsulot.", { reply_markup: ADMIN_KB_CATEGORY });
+    return;
+  }
+  const p = await Product.findById(productId).lean();
+  if (!p) {
+    await botInstance.sendMessage(chatId, 'Mahsulot topilmadi.', { reply_markup: ADMIN_KB_CATEGORY });
+    return;
+  }
+  const cat = await Category.findById(p.category_id).lean();
+  const pid = String(p._id);
+  const cid = String(p.category_id);
+  setState(userId, { type: 'catalog_view', categoryId: cid });
+
+  const mark = p.is_available !== false ? '✅ Sotuvda' : '❌ Sotuvda emas';
+  const imgLine = p.image_url ? `\n🖼 ${p.image_url}` : "\n🖼 Rasm yo'q";
+  const caption = `🛒 ${p.name_uz}\n${p.name_ru}\n💰 ${p.price} so'm\n${mark}${imgLine}`;
+  const catLine = cat ? cat.name_uz : '—';
+
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        { text: "✏️ Nom (O'zb)", callback_data: cbEditNameUz(pid) },
+        { text: '✏️ Nom (Rus)', callback_data: cbEditNameRu(pid) },
+      ],
+      [{ text: '💰 Narx', callback_data: cbPrice(pid) }],
+      [{ text: '🖼 Rasm (URL)', callback_data: cbEditImage(pid) }],
+      [{ text: "🚫 O'chirish", callback_data: cbDelAsk(pid) }],
+      [{ text: '⬅️ Mahsulotlar', callback_data: cbGotoCategory(cid) }],
+    ],
+  };
+
+  const header = `📂 ${catLine}\n\n`;
+
+  if (p.image_url && /^https?:\/\//i.test(String(p.image_url).trim())) {
+    try {
+      await botInstance.sendPhoto(chatId, String(p.image_url).trim(), {
+        caption: `${header}${caption}`,
+        reply_markup,
+      });
+    } catch (_) {
+      await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
+    }
+  } else {
+    await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
+  }
+
+  await botInstance.sendMessage(chatId, 'Pastdagi tugmalar (kategoriya):', { reply_markup: ADMIN_KB_CATEGORY });
 }
 
 async function startAddProductForCategory(chatId, userId, categoryId) {
@@ -273,6 +337,86 @@ async function handleAdminCallback(query) {
     return true;
   }
 
+  const mSel = data.match(/^adm_s_(.+)$/);
+  if (mSel) {
+    const pid = mSel[1];
+    if (!mongoose.isValidObjectId(pid)) {
+      await answer("Noto'g'ri ID", true);
+      return true;
+    }
+    await answer();
+    await sendProductAdminMenu(chatId, userId, pid);
+    return true;
+  }
+
+  const mEu = data.match(/^adm_eu_(.+)$/);
+  if (mEu) {
+    const pid = mEu[1];
+    if (!mongoose.isValidObjectId(pid)) {
+      await answer("Noto'g'ri ID", true);
+      return true;
+    }
+    const prod = await Product.findById(pid).select('category_id').lean();
+    if (!prod) {
+      await answer('Mahsulot topilmadi', true);
+      return true;
+    }
+    setState(userId, {
+      type: 'edit_product_name_uz',
+      productId: pid,
+      categoryId: String(prod.category_id),
+    });
+    await answer();
+    await botInstance.sendMessage(chatId, "Yangi nom (O'zbekcha):", { reply_markup: ADMIN_KB_CATEGORY });
+    return true;
+  }
+
+  const mEr = data.match(/^adm_er_(.+)$/);
+  if (mEr) {
+    const pid = mEr[1];
+    if (!mongoose.isValidObjectId(pid)) {
+      await answer("Noto'g'ri ID", true);
+      return true;
+    }
+    const prod = await Product.findById(pid).select('category_id').lean();
+    if (!prod) {
+      await answer('Mahsulot topilmadi', true);
+      return true;
+    }
+    setState(userId, {
+      type: 'edit_product_name_ru',
+      productId: pid,
+      categoryId: String(prod.category_id),
+    });
+    await answer();
+    await botInstance.sendMessage(chatId, 'Yangi nom (Ruscha):', { reply_markup: ADMIN_KB_CATEGORY });
+    return true;
+  }
+
+  const mIm = data.match(/^adm_im_(.+)$/);
+  if (mIm) {
+    const pid = mIm[1];
+    if (!mongoose.isValidObjectId(pid)) {
+      await answer("Noto'g'ri ID", true);
+      return true;
+    }
+    const prod = await Product.findById(pid).select('category_id').lean();
+    if (!prod) {
+      await answer('Mahsulot topilmadi', true);
+      return true;
+    }
+    setState(userId, {
+      type: 'await_product_image',
+      productId: pid,
+      categoryId: String(prod.category_id),
+    });
+    await answer();
+    await botInstance.sendMessage(chatId, "Rasm URL (https://... yoki 'skip'):", {
+      reply_markup: ADMIN_KB_CATEGORY,
+    });
+    return true;
+  }
+
   if (mPrice) {
     const pid = mPrice[1];
     if (!mongoose.isValidObjectId(pid)) {
@@ -327,10 +471,12 @@ async function handleAdminCallback(query) {
   }
 
   if (mDelCan) {
+    const pid = mDelCan[1];
     await answer("Bekor qilindi");
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, "O'chirish bekor qilindi.");
-    await sendCatalogRoot(chatId, userId);
+    await botInstance.sendMessage(chatId, "O'chirish bekor qilindi.", { reply_markup: ADMIN_KB_CATEGORY });
+    if (mongoose.isValidObjectId(pid)) await sendProductAdminMenu(chatId, userId, pid);
+    else await sendCatalogRoot(chatId, userId);
     return true;
   }
 
@@ -407,17 +553,62 @@ async function handleAdminMessage(msg) {
     const n = Number(text.replace(/\s/g, '').replace(/,/g, ''));
     if (!Number.isFinite(n) || n < 0) {
       clearAdminState(userId);
-      await botInstance.sendMessage(chatId, "❌ Noto'g'ri narx.");
-      if (st.categoryIdReturn) await sendCatalogCategoryView(chatId, userId, st.categoryIdReturn);
+      await botInstance.sendMessage(chatId, "❌ Noto'g'ri narx.", { reply_markup: ADMIN_KB_CATEGORY });
+      if (st.productId) await sendProductAdminMenu(chatId, userId, st.productId);
+      else if (st.categoryIdReturn) await sendCatalogCategoryView(chatId, userId, st.categoryIdReturn);
       else await sendCatalogRoot(chatId, userId);
       return true;
     }
     await Product.findByIdAndUpdate(st.productId, { price: n });
-    const ret = st.categoryIdReturn;
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, `✅ Narx yangilandi: ${n} so'm`);
-    if (ret) await sendCatalogCategoryView(chatId, userId, ret);
+    await botInstance.sendMessage(chatId, `✅ Narx yangilandi: ${n} so'm`, { reply_markup: ADMIN_KB_CATEGORY });
+    if (st.productId) await sendProductAdminMenu(chatId, userId, st.productId);
+    else if (st.categoryIdReturn) await sendCatalogCategoryView(chatId, userId, st.categoryIdReturn);
     else await sendCatalogRoot(chatId, userId);
+    return true;
+  }
+
+  if (st.type === 'edit_product_name_uz') {
+    if (!text) {
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", { reply_markup: ADMIN_KB_CATEGORY });
+      return true;
+    }
+    const pid = st.productId;
+    await Product.findByIdAndUpdate(pid, { name_uz: text });
+    clearAdminState(userId);
+    await botInstance.sendMessage(chatId, "✅ Nom (O'zbekcha) yangilandi.", { reply_markup: ADMIN_KB_CATEGORY });
+    await sendProductAdminMenu(chatId, userId, pid);
+    return true;
+  }
+
+  if (st.type === 'edit_product_name_ru') {
+    if (!text) {
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", { reply_markup: ADMIN_KB_CATEGORY });
+      return true;
+    }
+    const pid = st.productId;
+    await Product.findByIdAndUpdate(pid, { name_ru: text });
+    clearAdminState(userId);
+    await botInstance.sendMessage(chatId, '✅ Nom (Ruscha) yangilandi.', { reply_markup: ADMIN_KB_CATEGORY });
+    await sendProductAdminMenu(chatId, userId, pid);
+    return true;
+  }
+
+  if (st.type === 'await_product_image') {
+    const url = /^skip$/i.test(text) ? '' : text;
+    if (url && !/^https?:\/\//i.test(url)) {
+      await botInstance.sendMessage(
+        chatId,
+        "URL http/https bilan boshlanishi kerak yoki 'skip' yozing.",
+        { reply_markup: ADMIN_KB_CATEGORY }
+      );
+      return true;
+    }
+    const pid = st.productId;
+    await Product.findByIdAndUpdate(pid, { image_url: url });
+    clearAdminState(userId);
+    await botInstance.sendMessage(chatId, "✅ Rasm yangilandi.", { reply_markup: ADMIN_KB_CATEGORY });
+    await sendProductAdminMenu(chatId, userId, pid);
     return true;
   }
 
@@ -516,13 +707,19 @@ async function handleAdminMessage(msg) {
   }
 
   if (st.type !== 'idle') {
+    const kbCategoryFlow =
+      st.type === 'catalog_view' ||
+      st.type === 'add_product' ||
+      st.type === 'await_price' ||
+      st.type === 'edit_product_name_uz' ||
+      st.type === 'edit_product_name_ru' ||
+      st.type === 'await_product_image';
     await botInstance.sendMessage(chatId, "Tushunarsiz buyruq. ⬅️ Asosiy menyu yoki ⬅️ Kategoriyalar.", {
-      reply_markup:
-        st.type === 'catalog_view' || st.type === 'add_product'
-          ? ADMIN_KB_CATEGORY
-          : st.type === 'catalog_root' || st.type === 'add_category'
-            ? ADMIN_KB_CATALOG_ROOT
-            : ADMIN_KEYBOARD_MAIN,
+      reply_markup: kbCategoryFlow
+        ? ADMIN_KB_CATEGORY
+        : st.type === 'catalog_root' || st.type === 'add_category'
+          ? ADMIN_KB_CATALOG_ROOT
+          : ADMIN_KEYBOARD_MAIN,
     });
     return true;
   }
