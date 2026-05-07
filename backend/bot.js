@@ -25,17 +25,29 @@ const ADMIN_KB_CATALOG_ROOT = {
 
 const REMOVE_REPLY_KEYBOARD = { remove_keyboard: true };
 
-async function hideReplyKeyboard(chatId) {
-  try {
-    const sent = await botInstance.sendMessage(chatId, '\u2060', { reply_markup: REMOVE_REPLY_KEYBOARD });
-    try {
-      await botInstance.deleteMessage(chatId, sent.message_id);
-    } catch (_) {
-      /* ignore */
-    }
-  } catch (_) {
-    /* ignore */
-  }
+/**
+ * Reply klaviaturani yechib, bir xabarda inline tugmalarni edit orqali qo'shadi
+ * (oldingi send + delete + send o'rniga 2 ta API chaqiruv).
+ */
+async function sendStripKbThenInline(chatId, text, inlineKeyboard) {
+  const sent = await botInstance.sendMessage(chatId, text, { reply_markup: REMOVE_REPLY_KEYBOARD });
+  await botInstance.editMessageReplyMarkup(
+    { inline_keyboard: inlineKeyboard },
+    { chat_id: chatId, message_id: sent.message_id }
+  );
+  return sent;
+}
+
+async function sendPhotoStripKbThenInline(chatId, photoUrl, caption, inlineKeyboard) {
+  const sent = await botInstance.sendPhoto(chatId, photoUrl, {
+    caption,
+    reply_markup: REMOVE_REPLY_KEYBOARD,
+  });
+  await botInstance.editMessageReplyMarkup(
+    { inline_keyboard: inlineKeyboard },
+    { chat_id: chatId, message_id: sent.message_id }
+  );
+  return sent;
 }
 
 function getAdminId() {
@@ -183,10 +195,7 @@ async function sendCatalogRoot(chatId, userId) {
   const rows = cats.map((c) => [{ text: c.name_uz, callback_data: cbGotoCategory(String(c._id)) }]);
   rows.push([{ text: '⬅️ Asosiy menyu', callback_data: CB_ADMIN_MAIN_MENU }]);
   rows.push([{ text: "➕ Kategoriya qo'shish", callback_data: CB_ADMIN_NEW_CATEGORY }]);
-  await hideReplyKeyboard(chatId);
-  await botInstance.sendMessage(chatId, '📦 Katalog — kategoriyani tanlang:', {
-    reply_markup: { inline_keyboard: rows },
-  });
+  await sendStripKbThenInline(chatId, '📦 Katalog — kategoriyani tanlang:', rows);
 }
 
 /** Bitta kategoriya ichidagi mahsulotlar (nom bo'yicha tugmalar) */
@@ -210,10 +219,11 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   ];
 
   if (!products.length) {
-    await hideReplyKeyboard(chatId);
-    await botInstance.sendMessage(chatId, `📁 ${cat.name_uz}\n\nBu kategoriyada mahsulot yo'q.`, {
-      reply_markup: { inline_keyboard: footerRows },
-    });
+    await sendStripKbThenInline(
+      chatId,
+      `📁 ${cat.name_uz}\n\nBu kategoriyada mahsulot yo'q.`,
+      footerRows
+    );
     return;
   }
 
@@ -229,8 +239,7 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   ]);
   keyboard.push(...footerRows);
 
-  await hideReplyKeyboard(chatId);
-  await botInstance.sendMessage(chatId, text, { reply_markup: { inline_keyboard: keyboard } });
+  await sendStripKbThenInline(chatId, text, keyboard);
 }
 
 /** Tanlangan mahsulot: tahrirlash / narx / rasm / o'chirish */
@@ -250,8 +259,6 @@ async function sendProductAdminMenu(chatId, userId, productId) {
   const pid = String(p._id);
   const cid = String(p.category_id);
   setState(userId, { type: 'catalog_view', categoryId: cid });
-
-  await hideReplyKeyboard(chatId);
 
   const onSale = p.is_available !== false;
   const mark = onSale ? '✅ Sotuvda' : '❌ Sotuvda emas';
@@ -276,17 +283,16 @@ async function sendProductAdminMenu(chatId, userId, productId) {
 
   const header = `📂 ${catLine}\n\n`;
 
+  const inlineKb = reply_markup.inline_keyboard;
+
   if (p.image_url && /^https?:\/\//i.test(String(p.image_url).trim())) {
     try {
-      await botInstance.sendPhoto(chatId, String(p.image_url).trim(), {
-        caption: `${header}${caption}`,
-        reply_markup,
-      });
+      await sendPhotoStripKbThenInline(chatId, String(p.image_url).trim(), `${header}${caption}`, inlineKb);
     } catch (_) {
-      await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
+      await sendStripKbThenInline(chatId, `${header}${caption}`, inlineKb);
     }
   } else {
-    await botInstance.sendMessage(chatId, `${header}${caption}`, { reply_markup });
+    await sendStripKbThenInline(chatId, `${header}${caption}`, inlineKb);
   }
 }
 
