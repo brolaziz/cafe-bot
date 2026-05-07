@@ -10,7 +10,7 @@ const { initBot } = require('./bot');
 const menuRoutes = require('./routes/menu');
 const orderRoutes = require('./routes/orders');
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.PORT || 3000;
 const app = express();
 
 app.use(cors());
