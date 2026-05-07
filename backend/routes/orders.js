@@ -15,6 +15,21 @@ const ORDER_STATUSES = [
   'cancelled',
 ];
 
+/** Admin xabarida 📍 Manzil qatoridan keyin Yandex havolasi */
+function appendYandexMapsLinkToAdminOrderMessage(message, address) {
+  const encoded = encodeURIComponent(String(address || '').trim());
+  const mapLine = `🗺 Xaritada ko'rish: https://yandex.uz/maps/?text=${encoded}`;
+  const lines = message.split('\n');
+  const out = [];
+  for (const line of lines) {
+    out.push(line);
+    if (line.startsWith('📍 Manzil:')) {
+      out.push(mapLine);
+    }
+  }
+  return out.join('\n');
+}
+
 function validateOrderBody(body) {
   const errors = [];
   const {
@@ -137,7 +152,10 @@ router.post('/', async (req, res, next) => {
     const adminChatId = process.env.ADMIN_CHAT_ID;
     if (bot && adminChatId) {
       try {
-        const text = formatAdminOrderMessage(order);
+        const text = appendYandexMapsLinkToAdminOrderMessage(
+          formatAdminOrderMessage(order),
+          order.address
+        );
         await bot.sendMessage(adminChatId, text, {
           reply_markup: {
             inline_keyboard: [
