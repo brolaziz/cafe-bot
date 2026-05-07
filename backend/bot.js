@@ -89,6 +89,30 @@ function cbPickCat(cid) {
   return `adm_c_${cid}`;
 }
 
+async function handleStart(msg) {
+  if (!botInstance || !msg.chat?.id) return;
+  const chatId = msg.chat.id;
+  const name = (msg.from?.first_name && String(msg.from.first_name).trim()) || 'Mehmon';
+  const webAppUrl = process.env.WEB_APP_URL && String(process.env.WEB_APP_URL).trim();
+
+  const hello =
+    `Assalomu alaykum, ${name}! 👋\n\n` +
+    "Cafe botiga xush kelibsiz. Menyuni ochib, taomlardan buyurtma bering.";
+
+  if (webAppUrl) {
+    await botInstance.sendMessage(chatId, hello, {
+      reply_markup: {
+        inline_keyboard: [[{ text: '📱 Menyuni ochish', web_app: { url: webAppUrl } }]],
+      },
+    });
+  } else {
+    await botInstance.sendMessage(
+      chatId,
+      `${hello}\n\n⚠️ WEB_APP_URL sozlanmagan — tugma chiqishi uchun .env ga HTTPS manzilini qo'shing (BotFather → Bot → Configure Mini App).`
+    );
+  }
+}
+
 async function sendAdminMenu(chatId) {
   if (!botInstance) return;
   await botInstance.sendMessage(chatId, '🔐 Admin panel', { reply_markup: ADMIN_KEYBOARD });
@@ -515,6 +539,11 @@ function initBot() {
   botInstance.on('message', async (msg) => {
     if (!msg.chat || msg.chat.type !== 'private') return;
     try {
+      const text = msg.text != null ? String(msg.text).trim() : '';
+      if (text === '/start' || text.startsWith('/start ')) {
+        await handleStart(msg);
+        return;
+      }
       await handleAdminMessage(msg);
     } catch (err) {
       console.error('admin message handler:', err);
