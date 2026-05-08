@@ -20,7 +20,6 @@ export default function App() {
     if (tg) {
       tg.ready();
       tg.expand();
-      if (tg.requestFullscreen) tg.requestFullscreen();
       if (tg.disableClosingConfirmation) tg.disableClosingConfirmation();
       if (tg.lockOrientation) tg.lockOrientation();
       if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
