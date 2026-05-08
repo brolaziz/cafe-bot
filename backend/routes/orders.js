@@ -1,46 +1,20 @@
-const fs = require('fs');
-const path = require('path');
+const { Readable } = require('stream');
 const express = require('express');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
-const { getBot, formatAdminOrderMessage, appendYandexMapsLinkToAdminOrderMessage } = require('../bot');
+const {
+  getBot,
+  formatAdminOrderMessage,
+  appendYandexMapsLinkToAdminOrderMessage,
+  formatP2pNewPendingPaymentAdminMessage,
+} = require('../bot');
 
 const router = express.Router();
 
-const receiptsDir = path.join(__dirname, '..', 'uploads', 'receipts');
-
-function ensureReceiptsDir() {
-  try {
-    fs.mkdirSync(receiptsDir, { recursive: true });
-  } catch (_) {
-    /* ignore */
-  }
-}
-
-function unlinkSafe(filePath) {
-  if (!filePath) return;
-  try {
-    fs.unlinkSync(filePath);
-  } catch (_) {
-    /* ignore */
-  }
-}
-
-const receiptStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    ensureReceiptsDir();
-    cb(null, receiptsDir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || '') || '.jpg';
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-  },
-});
-
 const receiptUpload = multer({
-  storage: receiptStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype || !file.mimetype.startsWith('image/')) {
@@ -142,24 +116,20 @@ router.post(
     });
   },
   async (req, res, next) => {
-    const filePath = req.file?.path;
-
     try {
-      if (!req.file) {
+      if (!req.file || !req.file.buffer) {
         res.status(400).json({ error: "receipt maydoni kerak (multipart image)" });
         return;
       }
 
       const telegram_user_id = parseTelegramUserId(req.query.telegram_user_id);
       if (telegram_user_id === null) {
-        unlinkSafe(filePath);
         res.status(400).json({ error: 'telegram_user_id kerak' });
         return;
       }
 
       const { orderId } = req.params;
       if (!mongoose.isValidObjectId(String(orderId))) {
-        unlinkSafe(filePath);
         res.status(400).json({ error: "Noto'g'ri buyurtma identifikatori" });
         return;
       }
@@ -170,19 +140,16 @@ router.post(
       }).exec();
 
       if (!order) {
-        unlinkSafe(filePath);
         res.status(404).json({ error: 'Buyurtma topilmadi yoki sizga tegishli emas' });
         return;
       }
 
       if (String(order.payment_method || '').trim().toLowerCase() !== 'p2p') {
-        unlinkSafe(filePath);
         res.status(400).json({ error: 'Faqat P2P buyurtma uchun' });
         return;
       }
 
-      if (order.status !== 'pending') {
-        unlinkSafe(filePath);
+      if (order.status !== 'pending_payment') {
         res.status(400).json({ error: 'Bu buyurtma uchun chek yuborish mumkin emas' });
         return;
       }
@@ -190,37 +157,39 @@ router.post(
       const bot = getBot();
       const adminChatId = process.env.ADMIN_CHAT_ID;
       if (!bot || !adminChatId) {
-        unlinkSafe(filePath);
         res.status(503).json({ error: "Telegram admin sozlanmagan (ADMIN_CHAT_ID)" });
         return;
       }
 
       const username = order.telegram_username && String(order.telegram_username).trim();
-      const userLine = username ? `@${username}` : `(id: ${order.telegram_user_id})`;
-      const orderShort = String(order._id).slice(-6);
+      const atPart = username ? `@${username}` : "foydalanuvchi";
       const caption = [
         "💳 P2P TO'LOV CHEKI",
-        `👤 Mijoz: ${userLine}`,
-        `📋 Buyurtma: #${orderShort}`,
+        `👤 Mijoz: ${atPart} (telegram_user_id: ${order.telegram_user_id})`,
+        `📋 Buyurtma: #${order._id}`,
         `💰 Summa: ${order.total_price} so'm`,
       ].join('\n');
 
-      await bot.sendPhoto(adminChatId, filePath, {
+      const ext = (req.file.originalname && /\.[a-z0-9]+$/i.exec(req.file.originalname)?.[0]) || '.jpg';
+      const filename = `receipt${ext}`.slice(0, 64);
+      const stream = Readable.from(req.file.buffer);
+
+      await bot.sendPhoto(adminChatId, stream, {
+        filename,
+        contentType: req.file.mimetype || 'image/jpeg',
         caption,
         reply_markup: {
           inline_keyboard: [
             [
-              { text: '✅ Tasdiqlash', callback_data: `p2pok_${order._id}` },
-              { text: '❌ Rad etish', callback_data: `p2px_${order._id}` },
+              { text: '✅ Tasdiqlash', callback_data: `receipt_confirm_${order._id}` },
+              { text: '❌ Rad etish', callback_data: `receipt_reject_${order._id}` },
             ],
           ],
         },
       });
 
-      unlinkSafe(filePath);
       res.json({ ok: true });
     } catch (err) {
-      unlinkSafe(filePath);
       next(err);
     }
   }
@@ -228,6 +197,7 @@ router.post(
 
 const ORDER_STATUSES = [
   'pending',
+  'pending_payment',
   'paid',
   'confirmed',
   'preparing',
@@ -333,6 +303,10 @@ router.post('/', async (req, res, next) => {
       return;
     }
 
+    const isP2p = String(payment_method || '')
+      .trim()
+      .toLowerCase() === 'p2p';
+
     const orderPayload = {
       telegram_user_id,
       telegram_username: typeof telegram_username === 'string' ? telegram_username : '',
@@ -348,7 +322,9 @@ router.post('/', async (req, res, next) => {
       payment_method: payment_method.trim(),
     };
 
-    if (typeof status === 'string' && status && ORDER_STATUSES.includes(status)) {
+    if (isP2p) {
+      orderPayload.status = 'pending_payment';
+    } else if (typeof status === 'string' && status && ORDER_STATUSES.includes(status)) {
       orderPayload.status = status;
     }
 
@@ -358,19 +334,17 @@ router.post('/', async (req, res, next) => {
     const adminChatId = process.env.ADMIN_CHAT_ID;
     if (bot && adminChatId) {
       try {
-        const text = appendYandexMapsLinkToAdminOrderMessage(
-          formatAdminOrderMessage(order),
-          order.address
-        );
-        const isP2p = String(order.payment_method || '')
+        const isP2pOrder = String(order.payment_method || '')
           .trim()
           .toLowerCase() === 'p2p';
-        if (isP2p) {
-          await bot.sendMessage(
-            adminChatId,
-            `${text}\n\n💳 P2P: mijoz to'lov chekini bot orqali yuboradi.`
-          );
+        if (isP2pOrder) {
+          const p2pIntro = formatP2pNewPendingPaymentAdminMessage(order);
+          await bot.sendMessage(adminChatId, p2pIntro);
         } else {
+          const text = appendYandexMapsLinkToAdminOrderMessage(
+            formatAdminOrderMessage(order),
+            order.address
+          );
           await bot.sendMessage(adminChatId, text, {
             reply_markup: {
               inline_keyboard: [

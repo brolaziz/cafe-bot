@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { deleteAllMyOrders, deleteMyOrder, fetchMyOrders } from '../api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { deleteAllMyOrders, deleteMyOrder, fetchMyOrders, uploadOrderReceipt } from '../api';
 import AppHeader from '../components/AppHeader';
 import EmptyState from '../components/EmptyState';
 import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
 
 const STATUS_UZ = {
   pending: 'Kutilmoqda',
+  pending_payment: "To'lov kutilmoqda",
   paid: "To'langan",
   confirmed: 'Qabul qilindi',
   preparing: 'Tayyorlanmoqda',
@@ -14,7 +15,7 @@ const STATUS_UZ = {
   cancelled: 'Bekor qilindi',
 };
 
-const ACTIVE_STATUSES = new Set(['pending', 'paid', 'confirmed', 'preparing', 'ready']);
+const ACTIVE_STATUSES = new Set(['pending', 'pending_payment', 'paid', 'confirmed', 'preparing', 'ready']);
 
 function formatOrderWhen(iso) {
   if (!iso) return '—';
@@ -88,8 +89,36 @@ function ConfirmSheet({ open, title, description, confirmLabel, onConfirm, onCan
   );
 }
 
-function OrderCard({ order, index, telegramId, onRequestDelete, deletingId }) {
+function OrderCard({ order, index, telegramId, onRequestDelete, deletingId, onReceiptUploaded }) {
   const busy = deletingId === String(order._id);
+  const fileRef = useRef(null);
+  const [receiptPhase, setReceiptPhase] = useState('idle');
+  const [receiptErr, setReceiptErr] = useState('');
+
+  const isP2pPayWait =
+    order.status === 'pending_payment' && String(order.payment_method || '').trim().toLowerCase() === 'p2p';
+
+  async function handleReceiptFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !isP2pPayWait || !telegramId) return;
+    if (!file.type.startsWith('image/')) {
+      setReceiptErr('Faqat rasm fayli.');
+      return;
+    }
+    setReceiptErr('');
+    setReceiptPhase('uploading');
+    try {
+      await uploadOrderReceipt(telegramId, order._id, file);
+      setReceiptPhase('done');
+      onReceiptUploaded?.();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Xatolik.';
+      setReceiptErr(typeof msg === 'string' ? msg : 'Xatolik.');
+      setReceiptPhase('idle');
+    }
+  }
+
   return (
     <li
       className="group relative overflow-hidden rounded-[1.15rem] bg-card p-4 shadow-[0_4px_20px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.05] transition duration-300 ease-out animate-card-rise motion-reduce:animate-none"
@@ -101,9 +130,15 @@ function OrderCard({ order, index, telegramId, onRequestDelete, deletingId }) {
             <span className="text-[11px] font-bold uppercase tracking-wide text-muted">
               #{String(order._id).slice(-6)}
             </span>
-            <span className="rounded-full bg-primary/12 px-2.5 py-0.5 text-[11px] font-bold text-primarydark">
-              {STATUS_UZ[order.status] || order.status}
-            </span>
+            {isP2pPayWait ? (
+              <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-orange-900 ring-1 ring-orange-200/90">
+                💳 To&apos;lov kutilmoqda
+              </span>
+            ) : (
+              <span className="rounded-full bg-primary/12 px-2.5 py-0.5 text-[11px] font-bold text-primarydark">
+                {STATUS_UZ[order.status] || order.status}
+              </span>
+            )}
           </div>
           <p className="mt-2 text-xs text-muted">{formatOrderWhen(order.created_at)}</p>
           <p className="mt-1.5 text-sm font-semibold leading-snug text-ink">
@@ -112,6 +147,32 @@ function OrderCard({ order, index, telegramId, onRequestDelete, deletingId }) {
           <p className="mt-2 text-sm font-bold text-primarydark">
             {Number(order.total_price || 0).toLocaleString('uz-UZ')} so'm · {order.payment_method}
           </p>
+          {isP2pPayWait && telegramId ? (
+            <div className="mt-3">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(ev) => void handleReceiptFile(ev)}
+              />
+              {receiptPhase === 'done' ? (
+                <p className="text-xs font-bold leading-snug text-emerald-700">
+                  ✅ Chek yuborildi, tasdiqlanishini kuting
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  disabled={receiptPhase === 'uploading'}
+                  onClick={() => fileRef.current?.click()}
+                  className={`w-full rounded-2xl border-2 border-dashed border-primary/45 bg-primary/5 py-3 text-xs font-extrabold text-primarydark shadow-sm transition hover:bg-primary/10 disabled:opacity-55 ${pressable}`}
+                >
+                  {receiptPhase === 'uploading' ? 'Yuborilmoqda…' : "📎 Chek yuklash"}
+                </button>
+              )}
+              {receiptErr ? <p className="mt-1.5 text-xs font-medium text-red-700">{receiptErr}</p> : null}
+            </div>
+          ) : null}
           {order.address ? (
             <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted">
               <span className="mr-0.5" aria-hidden>
@@ -143,7 +204,7 @@ function OrderCard({ order, index, telegramId, onRequestDelete, deletingId }) {
   );
 }
 
-export default function ProfilePage({ tgUser, onBrowseMenu }) {
+export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 0 }) {
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [editing, setEditing] = useState(false);
@@ -156,6 +217,7 @@ export default function ProfilePage({ tgUser, onBrowseMenu }) {
   const [actionError, setActionError] = useState(null);
 
   const [confirm, setConfirm] = useState(null);
+  const ordersSectionRef = useRef(null);
 
   const telegramId = tgUser?.id;
   const telegramFullName = useMemo(() => {
@@ -201,6 +263,15 @@ export default function ProfilePage({ tgUser, onBrowseMenu }) {
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  useEffect(() => {
+    if (!ordersFocusSignal) return;
+    const id = window.requestAnimationFrame(() => {
+      ordersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setOrdersTab('active');
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [ordersFocusSignal]);
 
   function handleSaveProfile() {
     const name = displayName.trim();
@@ -367,6 +438,7 @@ export default function ProfilePage({ tgUser, onBrowseMenu }) {
           </section>
 
           <section
+            ref={ordersSectionRef}
             className="overflow-hidden rounded-[1.35rem] bg-card shadow-[0_6px_28px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.05] animate-card-rise motion-reduce:animate-none"
             style={{ animationDelay: '120ms' }}
           >
@@ -499,6 +571,7 @@ export default function ProfilePage({ tgUser, onBrowseMenu }) {
                             index={i}
                             telegramId={telegramId}
                             deletingId={deletingId}
+                            onReceiptUploaded={() => void loadOrders()}
                             onRequestDelete={(ord) => {
                               setActionError(null);
                               setConfirm({

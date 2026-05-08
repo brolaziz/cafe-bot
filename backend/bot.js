@@ -125,13 +125,33 @@ function appendYandexMapsLinkToAdminOrderMessage(message, address) {
   return out.join('\n');
 }
 
+/** Yangi P2P buyurtma (chek kutilmoqda) — admin xabari */
+function formatP2pNewPendingPaymentAdminMessage(order) {
+  const username = order.telegram_username && String(order.telegram_username).trim();
+  const userLine = username ? `@${username}` : '—';
+  const lines = [
+    `💳 YANGI P2P BUYURTMA #${order._id}`,
+    `👤 ${userLine}`,
+    `📞 ${order.phone}`,
+    `📍 Manzil: ${order.address}`,
+    '',
+    '🛒 Buyurtma:',
+  ];
+  for (const item of order.items) {
+    const lineTotal = item.price * item.qty;
+    lines.push(`- ${item.name} x${item.qty} = ${lineTotal} so'm`);
+  }
+  lines.push('', `💰 ${order.total_price} so'm`, '', '⏳ Chek kutilmoqda...');
+  return appendYandexMapsLinkToAdminOrderMessage(lines.join('\n'), order.address);
+}
+
 const P2P_RECEIPT_WINDOW_MS = 30 * 60 * 1000;
 
 async function findRecentPendingP2pOrder(telegramUserId) {
   const since = new Date(Date.now() - P2P_RECEIPT_WINDOW_MS);
   return Order.findOne({
     telegram_user_id: telegramUserId,
-    status: 'pending',
+    status: { $in: ['pending', 'pending_payment'] },
     payment_method: { $regex: /^p2p$/i },
     created_at: { $gte: since },
   })
@@ -177,8 +197,8 @@ async function handleCustomerP2pPhoto(msg) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '✅ Tasdiqlash', callback_data: `p2pok_${order._id}` },
-          { text: '❌ Rad etish', callback_data: `p2px_${order._id}` },
+          { text: '✅ Tasdiqlash', callback_data: `receipt_confirm_${order._id}` },
+          { text: '❌ Rad etish', callback_data: `receipt_reject_${order._id}` },
         ],
       ],
     },
@@ -189,7 +209,132 @@ async function handleCustomerP2pPhoto(msg) {
 }
 
 /**
- * P2P chek inline tugmalari (faqat admin).
+ * Mini-app cheki: receipt_confirm_ORDERID / receipt_reject_ORDERID (faqat pending_payment).
+ * @returns {Promise<boolean>}
+ */
+async function handleReceiptFlowCallback(query) {
+  const data = query.data;
+  const ok = data && /^receipt_confirm_(.+)$/.exec(data);
+  const rej = data && /^receipt_reject_(.+)$/.exec(data);
+  if (!ok && !rej) return false;
+
+  const uid = query.from?.id;
+  if (uid == null || !isAdmin(uid)) {
+    try {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Faqat admin', show_alert: false });
+    } catch (_) {
+      /* ignore */
+    }
+    return true;
+  }
+
+  const orderId = ok ? ok[1] : rej[1];
+  const msg = query.message;
+  const chatId = msg?.chat?.id;
+  const messageId = msg?.message_id;
+  if (!mongoose.isValidObjectId(orderId) || chatId == null || messageId == null) {
+    try {
+      await botInstance.answerCallbackQuery(query.id, { text: "Noto'g'ri ma'lumot", show_alert: false });
+    } catch (_) {
+      /* ignore */
+    }
+    return true;
+  }
+
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Buyurtma topilmadi', show_alert: false });
+      return true;
+    }
+
+    if (String(order.payment_method || '').trim().toLowerCase() !== 'p2p') {
+      await botInstance.answerCallbackQuery(query.id, { text: 'P2P buyurtma emas', show_alert: false });
+      return true;
+    }
+
+    if (order.status !== 'pending_payment') {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Buyurtma allaqachon qayta ishlangan', show_alert: false });
+      return true;
+    }
+
+    const prevCaption = msg.caption || '';
+    const emptyKeyboard = { inline_keyboard: [] };
+
+    if (ok) {
+      order.status = 'paid';
+      await order.save();
+
+      const suffix = "\n\n✅ To'lov tasdiqlandi";
+      const newCaption = (prevCaption || "💳 P2P") + suffix;
+      if (msg.photo && msg.photo.length) {
+        await botInstance.editMessageCaption(newCaption, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: emptyKeyboard,
+        });
+      } else {
+        await botInstance.editMessageText(newCaption, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: emptyKeyboard,
+        });
+      }
+
+      await botInstance.answerCallbackQuery(query.id);
+
+      await botInstance.sendMessage(
+        order.telegram_user_id,
+        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz tayyorlanmoqda 🍽"
+      );
+
+      const adminNotify = appendYandexMapsLinkToAdminOrderMessage(
+        formatAdminOrderMessage(order),
+        order.address
+      );
+      await botInstance.sendMessage(chatId, `${adminNotify}\n\n✅ P2P to'lov qabul qilindi.`);
+      return true;
+    }
+
+    order.status = 'cancelled';
+    await order.save();
+
+    const rejSuffix = "\n\n❌ To'lov rad etildi";
+    const rejCaption = (prevCaption || "💳 P2P") + rejSuffix;
+    if (msg.photo && msg.photo.length) {
+      await botInstance.editMessageCaption(rejCaption, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: emptyKeyboard,
+      });
+    } else {
+      await botInstance.editMessageText(rejCaption, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: emptyKeyboard,
+      });
+    }
+
+    await botInstance.answerCallbackQuery(query.id);
+
+    await botInstance.sendMessage(
+      order.telegram_user_id,
+      "❌ To'lov tasdiqlanmadi. Qayta urinib ko'ring"
+    );
+    return true;
+  } catch (err) {
+    console.error('handleReceiptFlowCallback:', err);
+    try {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Xatolik', show_alert: false });
+    } catch (_) {
+      /* ignore */
+    }
+    return true;
+  }
+}
+
+/**
+ * P2P chek inline tugmalari (faqat admin) — p2pok_/p2px_ (legacy + pending).
  * @returns {Promise<boolean>}
  */
 async function handleP2pReceiptCallback(query) {
@@ -233,7 +378,7 @@ async function handleP2pReceiptCallback(query) {
       return true;
     }
 
-    if (order.status !== 'pending') {
+    if (order.status !== 'pending' && order.status !== 'pending_payment') {
       await botInstance.answerCallbackQuery(query.id, { text: 'Buyurtma allaqachon qayta ishlangan', show_alert: false });
       return true;
     }
@@ -245,7 +390,7 @@ async function handleP2pReceiptCallback(query) {
       order.status = 'paid';
       await order.save();
 
-      const suffix = "\n\n✅ Tasdiqlandi (P2P)";
+      const suffix = "\n\n✅ To'lov tasdiqlandi";
       const newCaption = (prevCaption || "💳 P2P") + suffix;
       if (msg.photo && msg.photo.length) {
         await botInstance.editMessageCaption(newCaption, {
@@ -279,7 +424,7 @@ async function handleP2pReceiptCallback(query) {
     order.status = 'cancelled';
     await order.save();
 
-    const rejSuffix = "\n\n❌ Rad etildi (P2P)";
+    const rejSuffix = "\n\n❌ To'lov rad etildi";
     const rejCaption = (prevCaption || "💳 P2P") + rejSuffix;
     if (msg.photo && msg.photo.length) {
       await botInstance.editMessageCaption(rejCaption, {
@@ -299,7 +444,7 @@ async function handleP2pReceiptCallback(query) {
 
     await botInstance.sendMessage(
       order.telegram_user_id,
-      "❌ To'lov tasdiqlanmadi. Iltimos qayta urinib ko'ring yoki admin bilan bog'laning."
+      "❌ To'lov tasdiqlanmadi. Qayta urinib ko'ring"
     );
     return true;
   } catch (err) {
@@ -1058,6 +1203,9 @@ function initBot() {
       if (handled) return;
     }
 
+    const receiptFlowHandled = await handleReceiptFlowCallback(query);
+    if (receiptFlowHandled) return;
+
     const p2pHandled = await handleP2pReceiptCallback(query);
     if (p2pHandled) return;
 
@@ -1168,6 +1316,7 @@ module.exports = {
   getBot,
   formatAdminOrderMessage,
   appendYandexMapsLinkToAdminOrderMessage,
+  formatP2pNewPendingPaymentAdminMessage,
 };
 Object.defineProperty(module.exports, 'bot', {
   enumerable: true,

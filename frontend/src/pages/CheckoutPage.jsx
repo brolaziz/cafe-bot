@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, useId, useRef } from 'react';
-import { createOrder, fetchP2pCardPublic, uploadOrderReceipt } from '../api';
+import { useCallback, useEffect, useMemo, useState, useId } from 'react';
+import { createOrder, fetchP2pCardPublic } from '../api';
 import AppHeader, { HeaderIconButton } from '../components/AppHeader';
 import YandexAddressMap from '../components/YandexAddressMap';
 import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
@@ -27,7 +27,7 @@ function FloatingField({ id, label, children }) {
   );
 }
 
-export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSuccess }) {
+export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSuccess, onGoToProfileOrders }) {
   const mapDomId = useId().replace(/:/g, '');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -37,11 +37,6 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   const [completedOrder, setCompletedOrder] = useState(null);
   const [copyHint, setCopyHint] = useState('');
   const [p2pFromApi, setP2pFromApi] = useState({ card_number: '', card_owner: '' });
-  const receiptInputRef = useRef(null);
-  const [receiptUploading, setReceiptUploading] = useState(false);
-  const [receiptUploaded, setReceiptUploaded] = useState(false);
-  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState('');
-  const [receiptError, setReceiptError] = useState('');
 
   const total = useMemo(() => cartTotal(cart), [cart]);
 
@@ -149,45 +144,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   const textareaLabel =
     'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
-  useEffect(() => {
-    return () => {
-      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
-    };
-  }, [receiptPreviewUrl]);
-
-  async function handleReceiptFileChange(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !completedOrder?._id) return;
-    if (!file.type.startsWith('image/')) {
-      setReceiptError('Faqat rasm tanlang.');
-      return;
-    }
-    setReceiptError('');
-    setReceiptUploading(true);
-    try {
-      await uploadOrderReceipt(tgUser.id, completedOrder._id, file);
-      setReceiptPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(file);
-      });
-      setReceiptUploaded(true);
-    } catch (err) {
-      const msg = err.response?.data?.error || err.message || "Yuklash muvaffaqiyatsiz.";
-      setReceiptError(typeof msg === 'string' ? msg : "Xatolik.");
-    } finally {
-      setReceiptUploading(false);
-    }
-  }
-
   if (completedOrder) {
-    const orderShort = String(completedOrder._id || '')
-      .slice(-6)
-      .toUpperCase();
-    const totalNum = Number(completedOrder.total_price);
-    const totalLabel = Number.isFinite(totalNum)
-      ? `${totalNum.toLocaleString('uz-UZ')} so'm`
-      : `${completedOrder.total_price} so'm`;
     const isP2p =
       String(completedOrder.payment_method || '')
         .trim()
@@ -195,7 +152,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
     return (
       <div
-        className="pb-24"
+        className="bg-surface pb-24"
         style={{
           overflowY: 'scroll',
           WebkitOverflowScrolling: 'touch',
@@ -212,11 +169,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
             >
               <span className="select-none text-5xl leading-none animate-success-check">✅</span>
             </div>
-            <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-ink">Buyurtma qabul qilindi!</h1>
-            <p className="mt-2 text-base font-bold text-primarydark">
-              Buyurtma #{orderShort}
-            </p>
-            <p className="mt-1 text-lg font-extrabold text-primary">{totalLabel}</p>
+            <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-ink">✅ Buyurtma yaratildi!</h1>
           </div>
 
           {isP2p ? (
@@ -245,77 +198,31 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
                 {copyHint ? <p className="mt-2 text-xs font-semibold text-primarydark">{copyHint}</p> : null}
               </div>
 
-              <div className="rounded-2xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]">
-                <p className="text-sm font-bold text-ink">Chek yoki to&apos;lov skrinshotini yuklang</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  Chekingiz adminning Telegramiga bir zumda yetib boradi — to&apos;lovni tezroq tasdiqlashimiz uchun
-                  juda muhim.
-                </p>
-                {!receiptUploaded ? (
-                  <div
-                    role="status"
-                    className="mt-3 rounded-xl border border-amber-200/90 bg-amber-50/90 px-3.5 py-2.5 text-xs font-semibold leading-snug text-amber-950"
-                  >
-                    {receiptUploading ? (
-                      <>
-                        ⏳ Yuklanmoqda… Ilovani yoki brauzer oynasini <span className="underline">yopmang</span> —
-                        jarayon to&apos;xtab qolishi mumkin.
-                      </>
-                    ) : (
-                      <>
-                        ⚠️ Rasmni yuborganingizgacha ilovani yoki oynani <span className="underline">yopmang</span>.
-                        Aks holda yuklash uzilishi yoki buyurtma cheki yetib bormasligi mumkin.
-                      </>
-                    )}
-                  </div>
-                ) : null}
-
-                <input
-                  ref={receiptInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  disabled={receiptUploaded || receiptUploading}
-                  onChange={(ev) => void handleReceiptFileChange(ev)}
-                />
-
-                {!receiptUploaded ? (
-                  <button
-                    type="button"
-                    disabled={receiptUploading}
-                    onClick={() => receiptInputRef.current?.click()}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 py-4 text-sm font-extrabold text-primarydark transition hover:bg-primary/10 disabled:opacity-60"
-                  >
-                    {receiptUploading ? 'Yuborilmoqda…' : '📎 Rasm yuklash'}
-                  </button>
-                ) : null}
-
-                {receiptError ? (
-                  <p className="mt-3 text-sm font-medium text-red-700">{receiptError}</p>
-                ) : null}
-
-                {receiptUploaded && receiptPreviewUrl ? (
-                  <div className="mt-4 flex flex-col items-center gap-3">
-                    <img
-                      src={receiptPreviewUrl}
-                      alt="Chek"
-                      className="h-36 w-auto max-w-full rounded-xl border border-stone-200 object-contain shadow-sm"
-                    />
-                    <p className="text-sm font-bold text-emerald-700">✅ Yuborildi</p>
-                  </div>
-                ) : null}
-              </div>
+              <p className="text-center text-sm font-medium leading-relaxed text-muted">
+                To&apos;lovni amalga oshiring va buyurtmalarim bo&apos;limidan chekni yuboring.
+              </p>
             </>
           ) : null}
 
-          <div className="flex flex-col gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => onSuccess?.({ skipAlert: true })}
-              className="btn-primary w-full"
-            >
-              Menyuga qaytish
-            </button>
+          <div className="flex flex-col gap-3 pt-2">
+            {isP2p && typeof onGoToProfileOrders === 'function' ? (
+              <>
+                <button type="button" onClick={() => onGoToProfileOrders()} className="btn-primary w-full">
+                  Buyurtmalarimga o&apos;tish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSuccess?.({ skipAlert: true })}
+                  className="w-full rounded-2xl border border-stone-200 bg-white py-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-[0.98]"
+                >
+                  Menyuga qaytish
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => onSuccess?.({ skipAlert: true })} className="btn-primary w-full">
+                Menyuga qaytish
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -324,7 +231,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
   return (
     <div
-      className="pb-24"
+      className="bg-surface pb-24"
       style={{
         overflowY: 'scroll',
         WebkitOverflowScrolling: 'touch',

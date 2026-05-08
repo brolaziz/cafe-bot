@@ -14,6 +14,8 @@ export default function App() {
   const [mainTab, setMainTab] = useState('menu');
   const [overlay, setOverlay] = useState(null);
   const [cart, setCart] = useState([]);
+  /** Profil → Buyurtmalar bo'limiga scroll (checkout tugmasidan) */
+  const [ordersFocusSignal, setOrdersFocusSignal] = useState(0);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -91,6 +93,12 @@ export default function App() {
           tgUser={tgUser}
           onBack={() => setOverlay(null)}
           onSuccess={handleOrderSuccess}
+          onGoToProfileOrders={() => {
+            setCart([]);
+            setOverlay(null);
+            setMainTab('profile');
+            setOrdersFocusSignal((n) => n + 1);
+          }}
         />
       </div>
     );
@@ -120,7 +128,11 @@ export default function App() {
         )}
         {mainTab === 'address' && <AddressPage />}
         {mainTab === 'profile' && (
-          <ProfilePage tgUser={tgUser} onBrowseMenu={() => setMainTab('menu')} />
+          <ProfilePage
+            tgUser={tgUser}
+            onBrowseMenu={() => setMainTab('menu')}
+            ordersFocusSignal={ordersFocusSignal}
+          />
         )}
       </div>
       <BottomNav activeTab={mainTab} onChange={setMainTab} cartCount={cartCount} />
