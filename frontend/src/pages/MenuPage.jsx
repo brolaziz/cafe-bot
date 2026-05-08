@@ -5,7 +5,7 @@ import EmptyState from '../components/EmptyState';
 
 const CATEGORY_ICONS = ['☕', '🥐', '🍰', '🥤', '🍕', '🌮', '🥗', '🧋'];
 
-const SEARCH_DEBOUNCE_MS = 380;
+const SEARCH_DEBOUNCE_MS = 220;
 
 function categoryIcon(index) {
   return CATEGORY_ICONS[index % CATEGORY_ICONS.length];
