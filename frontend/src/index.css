@@ -8,10 +8,13 @@
   }
   body {
     @apply m-0 min-h-[100dvh] bg-surface text-ink antialiased;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
   #root {
     @apply min-h-[100dvh] max-w-[480px] mx-auto w-full overflow-x-hidden;
     padding-top: var(--tg-safe-area-top, 0px);
+    overscroll-behavior: none;
   }
 }
 

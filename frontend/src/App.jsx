@@ -20,6 +20,10 @@ export default function App() {
     if (tg) {
       tg.ready();
       tg.expand();
+      if (tg.requestFullscreen) tg.requestFullscreen();
+      if (tg.disableClosingConfirmation) tg.disableClosingConfirmation();
+      if (tg.lockOrientation) tg.lockOrientation();
+      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
       document.documentElement.style.setProperty(
         '--tg-safe-area-top',
         ((tg.safeAreaInset?.top || 0) + 16) + 'px'
