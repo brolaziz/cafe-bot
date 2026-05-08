@@ -14,6 +14,12 @@ const fieldBase =
 const labelBase =
   'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
+/** Scroll: min balandlik + vertikal scroll; pastki bo‘sh joy (pb-20 ≈ nav + xavfsiz zona) */
+const checkoutPageScrollStyle = {
+  minHeight: '100vh',
+  overflowY: 'auto',
+};
+
 function FloatingField({ id, label, children }) {
   return (
     <div className="relative">
@@ -192,9 +198,9 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
         .toLowerCase() === 'p2p';
 
     return (
-      <div className="flex min-h-[100dvh] flex-col bg-surface pb-8">
+      <div className="bg-surface pb-20" style={{ ...checkoutPageScrollStyle, paddingBottom: '80px' }}>
         <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
-        <div className="flex flex-1 flex-col gap-5 px-4 pt-8">
+        <div className="flex flex-col gap-5 px-4 pt-8">
           <div className="flex flex-col items-center text-center">
             <div
               className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 shadow-inner ring-4 ring-emerald-50"
@@ -277,7 +283,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
             </>
           ) : null}
 
-          <div className="mt-auto flex flex-col gap-3 pt-2">
+          <div className="flex flex-col gap-3 pt-4">
             <button
               type="button"
               onClick={() => onSuccess?.({ skipAlert: true })}
@@ -292,7 +298,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-surface pb-8">
+    <div className="bg-surface pb-20" style={checkoutPageScrollStyle}>
       <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
 
       <div className="px-4 pt-3">
@@ -300,7 +306,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
         <p className="text-sm text-muted">Manzil va to&apos;lov (P2P)</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-5 px-4 pt-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-4 pt-4">
         {error && (
           <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-800 ring-1 ring-red-200/80">
             {error}
@@ -393,7 +399,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
         <button
           type="submit"
           disabled={submitting || cart.length === 0}
-          className="btn-primary mt-auto w-full"
+          className="btn-primary w-full"
         >
           {submitting ? 'Yuborilmoqda…' : 'Tasdiqlash'}
         </button>

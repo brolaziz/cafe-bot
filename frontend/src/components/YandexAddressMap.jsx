@@ -6,7 +6,8 @@ export default function YandexAddressMap({
   mapContainerId,
   address,
   onAddressChange,
-  mapClassName = 'h-[250px] w-full overflow-hidden rounded-2xl bg-surface ring-1 ring-stone-200/80',
+  mapClassName =
+    'h-[250px] min-h-[250px] max-h-[250px] w-full shrink-0 overflow-hidden rounded-2xl bg-surface ring-1 ring-stone-200/80',
 }) {
   const mapRef = useRef(null);
   const placemarkRef = useRef(null);
@@ -143,7 +144,11 @@ export default function YandexAddressMap({
   return (
     <div className="block">
       <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted">Xarita</span>
-      <div id={mapContainerId} className={`mb-3 ${mapClassName}`} />
+      <div
+        id={mapContainerId}
+        className={`mb-3 ${mapClassName}`}
+        style={{ height: 250, minHeight: 250, maxHeight: 250 }}
+      />
       <button
         type="button"
         onClick={handleMyLocation}
