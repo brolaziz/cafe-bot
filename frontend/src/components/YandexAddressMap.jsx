@@ -6,7 +6,7 @@ export default function YandexAddressMap({
   mapContainerId,
   address,
   onAddressChange,
-  mapClassName = 'mb-3 h-[250px] w-full overflow-hidden rounded-2xl bg-surface ring-1 ring-stone-200/80',
+  mapClassName = 'h-[250px] w-full overflow-hidden rounded-2xl bg-surface ring-1 ring-stone-200/80',
 }) {
   const mapRef = useRef(null);
   const placemarkRef = useRef(null);
@@ -143,14 +143,14 @@ export default function YandexAddressMap({
   return (
     <div className="block">
       <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted">Xarita</span>
+      <div id={mapContainerId} className={`mb-3 ${mapClassName}`} />
       <button
         type="button"
         onClick={handleMyLocation}
-        className="mb-3 w-full rounded-2xl border border-stone-200 bg-card py-3 text-sm font-bold text-ink shadow-sm transition hover:border-primary/30 hover:bg-surface active:scale-[0.99]"
+        className="w-full rounded-2xl border border-stone-200 bg-card py-3 text-sm font-bold text-ink shadow-sm transition hover:border-primary/30 hover:bg-surface active:scale-[0.99]"
       >
         📍 Mening joylashuvim
       </button>
-      <div id={mapContainerId} className={mapClassName} />
       <p className="sr-only" aria-live="polite">
         {address ? `Tanlangan manzil: ${address}` : ''}
       </p>

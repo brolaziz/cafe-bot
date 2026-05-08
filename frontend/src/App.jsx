@@ -73,27 +73,13 @@ export default function App() {
 
   const tgUser = getTelegramUser();
 
-  if (overlay === 'cart') {
-    return (
-      <div key="cart" className="min-h-[100dvh] animate-page-slide">
-        <CartPage
-          cart={cart}
-          onBack={() => setOverlay(null)}
-          onCheckout={() => setOverlay('checkout')}
-          onChangeQty={changeQty}
-          onRemove={removeLine}
-        />
-      </div>
-    );
-  }
-
   if (overlay === 'checkout') {
     return (
       <div key="checkout" className="min-h-[100dvh] animate-page-slide">
         <CheckoutPage
           cart={cart}
           tgUser={tgUser}
-          onBack={() => setOverlay('cart')}
+          onBack={() => setOverlay(null)}
           onSuccess={handleOrderSuccess}
         />
       </div>
@@ -107,15 +93,27 @@ export default function App() {
           <MenuPage
             cart={cart}
             cartCount={cartCount}
-            onOpenCart={() => setOverlay('cart')}
+            onOpenCart={() => setMainTab('cart')}
             onAddToCart={addToCart}
             onChangeQty={changeQty}
           />
         )}
+        {mainTab === 'cart' && (
+          <CartPage
+            cart={cart}
+            onBrowseMenu={() => setMainTab('menu')}
+            onOpenAddress={() => setMainTab('address')}
+            onCheckout={() => setOverlay('checkout')}
+            onChangeQty={changeQty}
+            onRemove={removeLine}
+          />
+        )}
         {mainTab === 'address' && <AddressPage />}
-        {mainTab === 'profile' && <ProfilePage tgUser={tgUser} />}
+        {mainTab === 'profile' && (
+          <ProfilePage tgUser={tgUser} onBrowseMenu={() => setMainTab('menu')} />
+        )}
       </div>
-      <BottomNav activeTab={mainTab} onChange={setMainTab} />
+      <BottomNav activeTab={mainTab} onChange={setMainTab} cartCount={cartCount} />
     </div>
   );
 }

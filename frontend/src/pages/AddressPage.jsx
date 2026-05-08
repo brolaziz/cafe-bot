@@ -1,5 +1,6 @@
 import { useId, useEffect, useState } from 'react';
 import AppHeader from '../components/AppHeader';
+import EmptyState from '../components/EmptyState';
 import YandexAddressMap from '../components/YandexAddressMap';
 import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
 
@@ -54,6 +55,16 @@ export default function AddressPage() {
       </div>
 
       <div className="mt-4 flex flex-1 flex-col gap-5 px-4 pb-6">
+        {!address.trim() && !phone.trim() ? (
+          <EmptyState
+            emoji="📍"
+            title="Manzilingizni saqlang"
+            lines={[
+              "Xaritada bosing yoki joylashuv tugmasidan foydalaning - keyingi buyurtmada tezroq bo'lasiz.",
+            ]}
+            className="!py-6"
+          />
+        ) : null}
         <YandexAddressMap mapContainerId={mapId} address={address} onAddressChange={setAddress} />
 
         <div className="relative">

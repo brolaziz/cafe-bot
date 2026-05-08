@@ -30,11 +30,16 @@ export default {
           '35%': { transform: 'scale(1.22)' },
           '55%': { transform: 'scale(1.08)' },
         },
+        'empty-bob': {
+          '0%, 100%': { transform: 'translateY(0) rotate(-2deg)' },
+          '50%': { transform: 'translateY(-8px) rotate(2deg)' },
+        },
       },
       animation: {
         'page-slide': 'page-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         'tab-content': 'tab-content 0.28s ease-out forwards',
         'cart-bounce': 'cart-bounce 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'empty-bob': 'empty-bob 2.8s ease-in-out infinite',
       },
     },
   },

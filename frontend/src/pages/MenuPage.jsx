@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchCategories, fetchProducts } from '../api';
 import AppHeader from '../components/AppHeader';
+import EmptyState from '../components/EmptyState';
 
 const CATEGORY_ICONS = ['☕', '🥐', '🍰', '🥤', '🍕', '🌮', '🥗', '🧋'];
+
+const SEARCH_DEBOUNCE_MS = 380;
 
 function categoryIcon(index) {
   return CATEGORY_ICONS[index % CATEGORY_ICONS.length];
@@ -108,7 +111,6 @@ function ProductCard({ product, onAdd, onChangeQty, inCartQty, badgePulse }) {
 
 function CategoryProducts({
   categoryId,
-  searchQuery,
   qtyByProductId,
   pulseProductId,
   onAddToCart,
@@ -142,12 +144,7 @@ function CategoryProducts({
     };
   }, [categoryId, onProductFetchError]);
 
-  const visible = useMemo(() => {
-    const base = products.filter((p) => p.is_available !== false);
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((p) => (p.name_uz || '').toLowerCase().includes(q));
-  }, [products, searchQuery]);
+  const visible = useMemo(() => products.filter((p) => p.is_available !== false), [products]);
 
   if (loading) {
     return (
@@ -157,9 +154,11 @@ function CategoryProducts({
 
   if (visible.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted">
-        {searchQuery.trim() ? "Qidiruv bo'yicha mahsulot topilmadi." : "Bu kategoriyada mahsulot yo'q."}
-      </p>
+      <EmptyState
+        emoji="🍽"
+        title="Bu yerda hali mahsulot yo'q"
+        lines={['Boshqa kategoriyani tanlang yoki keyinroq qayta kiring.']}
+      />
     );
   }
 
@@ -182,17 +181,153 @@ function CategoryProducts({
   );
 }
 
+function SearchResultsPanel({
+  categories,
+  debouncedQuery,
+  qtyByProductId,
+  pulseProductId,
+  onAddToCart,
+  onChangeQty,
+  onClearSearch,
+}) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const q = debouncedQuery.trim().toLowerCase();
+    if (!q || !categories.length) {
+      setItems([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const lists = await Promise.all(categories.map((c) => fetchProducts(c._id)));
+        if (cancelled) return;
+        const seen = new Set();
+        const merged = [];
+        for (const list of lists) {
+          for (const p of list) {
+            if (p.is_available === false) continue;
+            const id = String(p._id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            merged.push(p);
+          }
+        }
+        const filtered = merged.filter((p) => (p.name_uz || '').toLowerCase().includes(q));
+        setItems(filtered);
+      } catch {
+        if (!cancelled) {
+          setItems([]);
+          setError("Qidiruv paytida xatolik. Qayta urinib ko'ring.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categories, debouncedQuery]);
+
+  if (!categories.length) {
+    return (
+      <EmptyState
+        emoji="📂"
+        title="Menyu hozircha yo'q"
+        lines={["Kategoriyalar paydo bo'lgach, qidiruv ishlaydi."]}
+        primaryLabel="Qidiruvni tozalash"
+        onPrimary={onClearSearch}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <EmptyState
+        emoji="😅"
+        title="Xatolik yuz berdi"
+        lines={[error]}
+        primaryLabel="Qayta urinish"
+        onPrimary={() => window.location.reload()}
+        secondaryLabel="Qidiruvni tozalash"
+        onSecondary={onClearSearch}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-12">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+        <p className="text-sm font-semibold text-muted">Qidirilmoqda…</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        emoji="🔎"
+        title="Hech narsa topilmadi"
+        lines={[`"${debouncedQuery.trim()}" bo'yicha natija yo'q. Boshqa so'z bilan urinib ko'ring.`]}
+        primaryLabel="Qidiruvni tozalash"
+        onPrimary={onClearSearch}
+        secondaryLabel="Mahsulotlarga qaytish"
+        onSecondary={onClearSearch}
+      />
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 pb-4">
+      {items.map((product) => {
+        const pid = String(product._id);
+        return (
+          <ProductCard
+            key={product._id}
+            product={product}
+            onAdd={onAddToCart}
+            onChangeQty={onChangeQty}
+            inCartQty={qtyByProductId[pid] ?? 0}
+            badgePulse={pulseProductId === pid}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onChangeQty }) {
   const [categories, setCategories] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [loadingCats, setLoadingCats] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
   const [productsError, setProductsError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [badgeBump, setBadgeBump] = useState(false);
   const [pulseProductId, setPulseProductId] = useState(null);
   const prevCartCount = useRef(cartCount);
   const pulseTimerRef = useRef(null);
+
+  const searchTrimmed = searchInput.trim();
+  const isSearchMode = searchTrimmed.length > 0;
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(searchTrimmed);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(t);
+  }, [searchTrimmed]);
 
   const qtyByProductId = useMemo(() => {
     const m = {};
@@ -204,6 +339,11 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
 
   const setProductsErrorStable = useCallback((v) => {
     setProductsError(v);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchInput('');
+    setDebouncedSearch('');
   }, []);
 
   const handleAddToCart = useCallback(
@@ -264,6 +404,8 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
     };
   }, []);
 
+  const searchPending = isSearchMode && debouncedSearch !== searchTrimmed;
+
   return (
     <div className="box-border flex h-[100dvh] flex-col overflow-hidden bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
       <section className="relative mx-4 mt-2 shrink-0 overflow-hidden rounded-2xl shadow-card ring-1 ring-black/[0.05]">
@@ -312,18 +454,25 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
               inputMode="search"
               autoComplete="off"
               placeholder="Mahsulot qidirish…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full rounded-full border border-stone-200/90 bg-card py-3.5 pl-12 pr-4 text-sm font-medium text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </label>
         </div>
 
-        <div className="border-b border-stone-100 pb-2">
+        <div className={`border-b border-stone-100 pb-2 ${isSearchMode ? 'opacity-60' : ''}`}>
           {loadingCats ? (
             <div className="px-4 py-2 text-sm font-medium text-muted">Yuklanmoqda…</div>
           ) : categories.length === 0 ? (
-            <div className="px-4 py-2 text-sm text-muted">Kategoriyalar yo'q.</div>
+            <div className="px-4 py-2">
+              <EmptyState
+                emoji="📂"
+                title="Kategoriyalar yo'q"
+                lines={["Hozircha menyu bo'sh. Keyinroq qayta kiring."]}
+                className="!py-6"
+              />
+            </div>
           ) : (
             <div className="flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide">
               {categories.map((cat, index) => {
@@ -333,11 +482,12 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
                   <button
                     key={cat._id}
                     type="button"
+                    disabled={isSearchMode}
                     onClick={() => {
                       setProductsError(null);
                       setActiveId(cat._id);
                     }}
-                    className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold transition duration-200 active:scale-95 ${
+                    className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold transition duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-50 ${
                       active
                         ? 'border-primary bg-primary text-white shadow-md shadow-primary/20'
                         : 'border-stone-200 bg-card text-ink shadow-sm hover:border-primary/30'
@@ -363,11 +513,46 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
         )}
 
         <main className="px-4 pt-4">
-          {activeId ? (
+          {isSearchMode ? (
+            <div className="animate-tab-content">
+              <div className="mb-4 rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/12 via-card to-amber-50/40 p-4 shadow-sm ring-1 ring-primary/10">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-wider text-primary">Qidiruv natijalari</p>
+                    <h3 className="mt-1 text-lg font-extrabold text-ink">"{searchTrimmed}"</h3>
+                    <p className="mt-1 text-xs font-medium text-muted">Barcha kategoriyalar bo'ylab</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="shrink-0 rounded-full border border-stone-200/90 bg-white px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-surface active:scale-95"
+                  >
+                    Bekor qilish
+                  </button>
+                </div>
+              </div>
+
+              {searchPending ? (
+                <div className="flex flex-col items-center gap-3 py-10">
+                  <div className="h-9 w-9 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+                  <p className="text-sm font-semibold text-muted">So'rov tayyorlanmoqda…</p>
+                </div>
+              ) : (
+                <SearchResultsPanel
+                  categories={categories}
+                  debouncedQuery={debouncedSearch}
+                  qtyByProductId={qtyByProductId}
+                  pulseProductId={pulseProductId}
+                  onAddToCart={handleAddToCart}
+                  onChangeQty={onChangeQty}
+                  onClearSearch={clearSearch}
+                />
+              )}
+            </div>
+          ) : activeId ? (
             <div key={activeId} className="animate-tab-content">
               <CategoryProducts
                 categoryId={activeId}
-                searchQuery={searchQuery}
                 qtyByProductId={qtyByProductId}
                 pulseProductId={pulseProductId}
                 onAddToCart={handleAddToCart}

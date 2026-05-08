@@ -1,4 +1,5 @@
-import AppHeader, { HeaderIconButton } from '../components/AppHeader';
+import AppHeader from '../components/AppHeader';
+import EmptyState from '../components/EmptyState';
 
 function lineTotal(line) {
   return line.price * line.qty;
@@ -10,22 +11,33 @@ function shouldUseImagePlaceholder(url) {
   return u.includes('example.com');
 }
 
-export default function CartPage({ cart, onBack, onCheckout, onChangeQty, onRemove }) {
+export default function CartPage({ cart, onBrowseMenu, onOpenAddress, onCheckout, onChangeQty, onRemove }) {
   const total = cart.reduce((s, line) => s + lineTotal(line), 0);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-surface">
-      <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
+    <div className="flex min-h-[100dvh] flex-col bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
+      <AppHeader end={null} />
 
       {cart.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-card text-5xl shadow-card ring-1 ring-black/[0.06]">
-            🛒
+        <div className="flex flex-1 flex-col px-4 pb-6 pt-2">
+          <div className="mb-2 px-1">
+            <h2 className="text-xl font-bold text-ink">Savat</h2>
+            <p className="text-sm text-muted">Tanlangan mahsulotlar shu yerda chiqadi</p>
           </div>
-          <p className="text-base font-semibold text-muted">Savat bo'sh.</p>
-          <button type="button" onClick={onBack} className="btn-primary px-10">
-            Menyuga qaytish
-          </button>
+          <div className="flex flex-1 flex-col justify-center">
+            <EmptyState
+              emoji="👀"
+              title="Savatchangiz hozircha bo'sh"
+              lines={[
+                "Mazali narsalarni qo'shib ko'ring 😋",
+                "Mahsulotlar bo'limida aylanib chiqing - biz kutamiz!",
+              ]}
+              primaryLabel="Mahsulotlarni ko'rish"
+              onPrimary={onBrowseMenu}
+              secondaryLabel="Manzilimni sozlash"
+              onSecondary={onOpenAddress}
+            />
+          </div>
         </div>
       ) : (
         <>
@@ -100,7 +112,7 @@ export default function CartPage({ cart, onBack, onCheckout, onChangeQty, onRemo
             })}
           </ul>
 
-          <div className="sticky bottom-0 z-20 border-t border-stone-200/80 bg-card/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md">
+          <div className="sticky bottom-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))] z-20 border-t border-stone-200/80 bg-card/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-muted">Jami</span>
               <span className="text-2xl font-extrabold tracking-tight text-ink">
