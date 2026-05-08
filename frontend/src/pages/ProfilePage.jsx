@@ -7,6 +7,7 @@ import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
 const STATUS_UZ = {
   pending: 'Kutilmoqda',
   pending_payment: "To'lov kutilmoqda",
+  receipt_sent: 'Chek yuborildi (tasdiq kutilmoqda)',
   paid: "To'langan",
   confirmed: 'Qabul qilindi',
   preparing: 'Tayyorlanmoqda',
@@ -121,8 +122,9 @@ function OrderCard({ order, index, telegramId, onRequestDelete, deletingId, onRe
   const [receiptPhase, setReceiptPhase] = useState('idle');
   const [receiptErr, setReceiptErr] = useState('');
 
-  const isP2pPayWait =
-    order.status === 'pending_payment' && String(order.payment_method || '').trim().toLowerCase() === 'p2p';
+  const isP2p = String(order.payment_method || '').trim().toLowerCase() === 'p2p';
+  const isP2pPayWait = order.status === 'pending_payment' && isP2p;
+  const isP2pReceiptSent = order.status === 'receipt_sent' && isP2p;
 
   async function handleReceiptFile(e) {
     const file = e.target.files?.[0];
@@ -159,6 +161,10 @@ function OrderCard({ order, index, telegramId, onRequestDelete, deletingId, onRe
             {isP2pPayWait ? (
               <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-orange-900 ring-1 ring-orange-200/90">
                 💳 To&apos;lov kutilmoqda
+              </span>
+            ) : isP2pReceiptSent ? (
+              <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-bold text-sky-900 ring-1 ring-sky-200/90">
+                ⏳ {STATUS_UZ.receipt_sent}
               </span>
             ) : (
               <span className="rounded-full bg-primary/12 px-2.5 py-0.5 text-[11px] font-bold text-primarydark">

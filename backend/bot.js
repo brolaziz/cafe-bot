@@ -192,24 +192,38 @@ async function handleCustomerP2pPhoto(msg) {
     `💰 Summa: ${order.total_price} so'm`,
   ].join('\n');
 
-  await botInstance.sendPhoto(adminChatId, fileId, {
-    caption,
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: '✅ Tasdiqlash', callback_data: `receipt_confirm_${order._id}` },
-          { text: '❌ Rad etish', callback_data: `receipt_reject_${order._id}` },
+  const prevStatus = order.status;
+  order.status = 'receipt_sent';
+  await order.save();
+  try {
+    await botInstance.sendPhoto(adminChatId, fileId, {
+      caption,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Tasdiqlash', callback_data: `receipt_confirm_${order._id}` },
+            { text: '❌ Rad etish', callback_data: `receipt_reject_${order._id}` },
+          ],
         ],
-      ],
-    },
-  });
+      },
+    });
+  } catch (err) {
+    order.status = prevStatus;
+    await order.save();
+    console.error('handleCustomerP2pPhoto sendPhoto:', err);
+    await botInstance.sendMessage(
+      msg.chat.id,
+      "⚠️ Chekni adminga yuborishda xatolik. Internetni tekshirib, qayta urinib ko'ring."
+    );
+    return true;
+  }
 
   await botInstance.sendMessage(msg.chat.id, "✅ Chekingiz adminga yuborildi. Tasdiqlanishini kuting!");
   return true;
 }
 
 /**
- * Mini-app cheki: receipt_confirm_ORDERID / receipt_reject_ORDERID (faqat pending_payment).
+ * Mini-app / bot cheki: receipt_confirm_ORDERID / receipt_reject_ORDERID (pending_payment yoki receipt_sent).
  * @returns {Promise<boolean>}
  */
 async function handleReceiptFlowCallback(query) {
@@ -253,7 +267,7 @@ async function handleReceiptFlowCallback(query) {
       return true;
     }
 
-    if (order.status !== 'pending_payment') {
+    if (order.status !== 'pending_payment' && order.status !== 'receipt_sent') {
       await botInstance.answerCallbackQuery(query.id, { text: 'Buyurtma allaqachon qayta ishlangan', show_alert: false });
       return true;
     }
@@ -378,7 +392,11 @@ async function handleP2pReceiptCallback(query) {
       return true;
     }
 
-    if (order.status !== 'pending' && order.status !== 'pending_payment') {
+    if (
+      order.status !== 'pending' &&
+      order.status !== 'pending_payment' &&
+      order.status !== 'receipt_sent'
+    ) {
       await botInstance.answerCallbackQuery(query.id, { text: 'Buyurtma allaqachon qayta ishlangan', show_alert: false });
       return true;
     }
