@@ -174,21 +174,29 @@ router.post(
       const filename = `receipt${ext}`.slice(0, 64);
       const stream = Readable.from(req.file.buffer);
 
-      await bot.sendPhoto(adminChatId, stream, {
-        filename,
-        contentType: req.file.mimetype || 'image/jpeg',
-        caption,
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ Tasdiqlash', callback_data: `receipt_confirm_${order._id}` },
-              { text: '❌ Rad etish', callback_data: `receipt_reject_${order._id}` },
+      order.status = 'receipt_sent';
+      await order.save();
+      try {
+        await bot.sendPhoto(adminChatId, stream, {
+          filename,
+          contentType: req.file.mimetype || 'image/jpeg',
+          caption,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Tasdiqlash', callback_data: `receipt_confirm_${order._id}` },
+                { text: '❌ Rad etish', callback_data: `receipt_reject_${order._id}` },
+              ],
             ],
-          ],
-        },
-      });
+          },
+        });
+      } catch (sendErr) {
+        order.status = 'pending_payment';
+        await order.save();
+        throw sendErr;
+      }
 
-      res.json({ ok: true });
+      res.json({ ok: true, status: 'receipt_sent' });
     } catch (err) {
       next(err);
     }
@@ -198,6 +206,7 @@ router.post(
 const ORDER_STATUSES = [
   'pending',
   'pending_payment',
+  'receipt_sent',
   'paid',
   'confirmed',
   'preparing',
