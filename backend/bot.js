@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Order = require('./models/Order');
 const Category = require('./models/Category');
 const Product = require('./models/Product');
+const AppSetting = require('./models/AppSetting');
 const { deleteOldOrders, ORDER_RETENTION_DAYS } = require('./orderCleanup');
 
 let botInstance = null;
@@ -11,9 +12,18 @@ let botInstance = null;
 /** @type {Map<number, object>} */
 const adminState = new Map();
 
-/** Asosiy admin (faqat katalog + tozalash) */
+/** Asosiy admin (katalog, P2P karta, tozalash) */
 const ADMIN_KEYBOARD_MAIN = {
-  keyboard: [[{ text: '📦 Katalog' }], [{ text: '🗑 Tozalash' }]],
+  keyboard: [
+    [{ text: '📦 Katalog' }],
+    [{ text: '💳 P2P karta' }],
+    [{ text: '🗑 Tozalash' }],
+  ],
+  resize_keyboard: true,
+};
+
+const KB_P2P_EDIT_CANCEL = {
+  keyboard: [[{ text: '⬅️ Bekor' }]],
   resize_keyboard: true,
 };
 
@@ -67,6 +77,14 @@ function setState(userId, state) {
 
 function getBot() {
   return botInstance;
+}
+
+async function getOrCreateAppSettings() {
+  let d = await AppSetting.findOne();
+  if (!d) {
+    d = await AppSetting.create({ p2p_card_number: '', p2p_card_owner: '' });
+  }
+  return d;
 }
 
 function formatAdminOrderMessage(order) {
@@ -788,6 +806,18 @@ async function handleAdminMessage(msg) {
     return true;
   }
 
+  if (text === '💳 P2P karta') {
+    clearAdminState(userId);
+    const cur = await getOrCreateAppSettings();
+    setState(userId, { type: 'edit_p2p_card', step: 'number' });
+    await botInstance.sendMessage(
+      chatId,
+      `💳 P2P karta (mini-app checkoutda ko'rinadi)\n\nJoriy raqam: ${cur.p2p_card_number || '—'}\nJoriy egasi: ${cur.p2p_card_owner || '—'}\n\nYangi karta raqamini yuboring (bo'sh joy bilan ham bo'lishi mumkin):`,
+      { reply_markup: KB_P2P_EDIT_CANCEL }
+    );
+    return true;
+  }
+
   if (text === '⬅️ Asosiy menyu') {
     clearAdminState(userId);
     await botInstance.sendMessage(chatId, 'Asosiy menyu.', { reply_markup: ADMIN_KEYBOARD_MAIN });
@@ -813,6 +843,48 @@ async function handleAdminMessage(msg) {
         "Avval kategoriya ichiga kiring: 📦 Katalog → kategoriyani tanlang.",
         { reply_markup: st.type === 'catalog_root' ? ADMIN_KB_CATALOG_ROOT : ADMIN_KEYBOARD_MAIN }
       );
+    }
+    return true;
+  }
+
+  if (st.type === 'edit_p2p_card') {
+    if (text === '⬅️ Bekor' || /^\/bekor$/i.test(text)) {
+      clearAdminState(userId);
+      await botInstance.sendMessage(chatId, 'Bekor qilindi.', { reply_markup: ADMIN_KEYBOARD_MAIN });
+      return true;
+    }
+    if (st.step === 'number') {
+      if (!text) {
+        await botInstance.sendMessage(chatId, 'Karta raqamini kiriting yoki «⬅️ Bekor».', {
+          reply_markup: KB_P2P_EDIT_CANCEL,
+        });
+        return true;
+      }
+      await AppSetting.findOneAndUpdate({}, { $set: { p2p_card_number: text.trim() } }, { upsert: true });
+      setState(userId, { type: 'edit_p2p_card', step: 'owner' });
+      await botInstance.sendMessage(
+        chatId,
+        "✅ Raqam saqlandi.\nKarta egasining ism-familiyasini (F.I.O) yuboring:",
+        { reply_markup: KB_P2P_EDIT_CANCEL }
+      );
+      return true;
+    }
+    if (st.step === 'owner') {
+      if (!text) {
+        await botInstance.sendMessage(chatId, "Ism-familiyani kiriting yoki «⬅️ Bekor».", {
+          reply_markup: KB_P2P_EDIT_CANCEL,
+        });
+        return true;
+      }
+      await AppSetting.findOneAndUpdate({}, { $set: { p2p_card_owner: text.trim() } }, { upsert: true });
+      clearAdminState(userId);
+      const fin = await getOrCreateAppSettings();
+      await botInstance.sendMessage(
+        chatId,
+        `✅ P2P karta yangilandi.\n\n📇 Raqam: ${fin.p2p_card_number || '—'}\n👤 Egasi: ${fin.p2p_card_owner || '—'}`,
+        { reply_markup: ADMIN_KEYBOARD_MAIN }
+      );
+      return true;
     }
     return true;
   }
@@ -948,12 +1020,15 @@ async function handleAdminMessage(msg) {
       st.type === 'await_price' ||
       st.type === 'edit_product_name_uz' ||
       st.type === 'await_product_image';
+    const kbP2pEdit = st.type === 'edit_p2p_card';
     await botInstance.sendMessage(chatId, "Tushunarsiz buyruq. Inline tugmalar yoki 📦 Katalog orqali davom eting.", {
       reply_markup: kbCategoryFlow
         ? REMOVE_REPLY_KEYBOARD
-        : st.type === 'catalog_root' || st.type === 'add_category'
-          ? ADMIN_KB_CATALOG_ROOT
-          : ADMIN_KEYBOARD_MAIN,
+        : kbP2pEdit
+          ? KB_P2P_EDIT_CANCEL
+          : st.type === 'catalog_root' || st.type === 'add_category'
+            ? ADMIN_KB_CATALOG_ROOT
+            : ADMIN_KEYBOARD_MAIN,
     });
     return true;
   }

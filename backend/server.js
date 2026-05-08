@@ -11,6 +11,7 @@ const { initBot } = require('./bot');
 const { deleteOldOrders } = require('./orderCleanup');
 const menuRoutes = require('./routes/menu');
 const orderRoutes = require('./routes/orders');
+const settingsRoutes = require('./routes/settings');
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -23,6 +24,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api', menuRoutes);
+app.use('/api', settingsRoutes);
 app.use('/api/orders', orderRoutes);
 
 app.use((req, res) => {

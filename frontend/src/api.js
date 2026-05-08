@@ -2,6 +2,11 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+export const fetchP2pCardPublic = async () => {
+  const res = await axios.get(`${BASE_URL}/api/settings/p2p`);
+  return res.data;
+};
+
 export const fetchCategories = async () => {
   const res = await axios.get(`${BASE_URL}/api/categories`);
   return res.data;
