@@ -484,135 +484,135 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
   return (
     <div className="relative box-border flex h-[100dvh] flex-col overflow-hidden bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
       <div
-        className={`flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
+        className={`relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
         aria-hidden={isSearchMode}
       >
-        <section
-          className="relative isolate h-[180px] w-full shrink-0 overflow-hidden rounded-b-2xl bg-gradient-to-br from-neutral-900 via-ink to-primarydark shadow-[0_4px_20px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.08]"
-          aria-label="Menyu banner"
-        >
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: `linear-gradient(to bottom, rgba(26,26,26,0.35), rgba(10,10,10,0.82)), url(${HERO_FOOD_IMAGE})`,
-            }}
-          />
-          <div className="relative flex h-full flex-col justify-end px-5 pb-5 pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">BUGUN</p>
-            <h2 className="mt-1.5 text-2xl font-extrabold leading-tight tracking-tight text-white">Yangi taomlar</h2>
-            <p className="mt-1 max-w-[280px] text-sm leading-snug text-white/85">
-              Tez yetkazib beramiz — mazali va issiq.
-            </p>
-          </div>
-        </section>
-
-        <div className="mt-2 shrink-0 bg-surface shadow-[0_1px_0_rgba(0,0,0,0.06)]">
-          <AppHeader
-            end={
-              <button
-                type="button"
-                onClick={onOpenCart}
-                className="relative flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-95"
-              >
-                <span className="text-base" aria-hidden>
-                  🛒
-                </span>
-                <span>Savat</span>
-                {cartCount > 0 && (
-                  <span
-                    className={`absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-white ${
-                      badgeBump ? 'animate-cart-bounce' : ''
-                    }`}
-                  >
-                    {cartCount > 99 ? '99+' : cartCount}
-                  </span>
-                )}
-              </button>
-            }
-          />
-
-          {!isSearchMode ? (
-            <div className="px-4 pb-2 pt-3">
-              <label className="relative block">
-                <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  inputMode="search"
-                  autoComplete="off"
-                  placeholder="Mahsulot qidirish…"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full rounded-full border border-stone-200/90 bg-card py-3.5 pl-12 pr-4 text-sm font-medium text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </label>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-hide">
+          <section
+            className="sticky top-0 z-0 isolate h-[200px] w-full shrink-0 overflow-hidden rounded-b-2xl bg-gradient-to-br from-neutral-900 via-ink to-primarydark shadow-[0_4px_20px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.08]"
+            aria-label="Menyu banner"
+          >
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `linear-gradient(to bottom, rgba(26,26,26,0.35), rgba(10,10,10,0.82)), url(${HERO_FOOD_IMAGE})`,
+              }}
+            />
+            <div className="relative flex h-full min-h-0 flex-col justify-end px-5 pb-6 pt-14">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">BUGUN</p>
+              <h2 className="mt-1.5 text-2xl font-extrabold leading-tight tracking-tight text-white">Yangi taomlar</h2>
+              <p className="mt-1 max-w-[280px] pb-0.5 text-sm leading-snug text-white/85">
+                Tez yetkazib beramiz — mazali va issiq.
+              </p>
             </div>
-          ) : null}
+          </section>
 
-          <div className="border-b border-stone-100 pb-2">
-            {loadingCats ? (
-              <div className="px-4 py-2 text-sm font-medium text-muted">Yuklanmoqda…</div>
-            ) : categories.length === 0 ? (
-              <div className="px-4 py-2">
-                <EmptyState
-                  emoji="📂"
-                  title="Kategoriyalar yo'q"
-                  lines={["Hozircha menyu bo'sh. Keyinroq qayta kiring."]}
-                  className="!py-6"
-                />
-              </div>
-            ) : (
-              <div className="flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide">
-                {categories.map((cat, index) => {
-                  const active = String(cat._id) === String(activeId);
-                  const icon = categoryIcon(index);
-                  return (
-                    <button
-                      key={cat._id}
-                      type="button"
-                      onClick={() => {
-                        setProductsError(null);
-                        setActiveId(cat._id);
-                      }}
-                      className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold transition duration-200 active:scale-95 ${
-                        active
-                          ? 'border-primary bg-primary text-white shadow-md shadow-primary/20'
-                          : 'border-stone-200 bg-card text-ink shadow-sm hover:border-primary/30'
+          <div className="relative z-10 -mt-5 flex w-full flex-col rounded-t-3xl bg-white pb-4 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.05]">
+            <AppHeader
+              end={
+                <button
+                  type="button"
+                  onClick={onOpenCart}
+                  className="relative flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-95"
+                >
+                  <span className="text-base" aria-hidden>
+                    🛒
+                  </span>
+                  <span>Savat</span>
+                  {cartCount > 0 && (
+                    <span
+                      className={`absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-white ${
+                        badgeBump ? 'animate-cart-bounce' : ''
                       }`}
                     >
-                      <span className="text-base leading-none" aria-hidden>
-                        {icon}
-                      </span>
-                      <span className="max-w-[150px] truncate">{cat.name_uz}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </button>
+              }
+            />
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-hide">
-          {(categoriesError || productsError) && (
-            <div className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-800 ring-1 ring-red-200/80">
-              {categoriesError || productsError}
-            </div>
-          )}
-
-          <main className="px-4 pt-4">
-            {activeId ? (
-              <div key={activeId}>
-                <CategoryProducts
-                  categoryId={activeId}
-                  qtyByProductId={qtyByProductId}
-                  pulseProductId={pulseProductId}
-                  onAddToCart={handleAddToCart}
-                  onChangeQty={onChangeQty}
-                  onProductFetchError={setProductsErrorStable}
-                />
+            {!isSearchMode ? (
+              <div className="px-4 pb-2 pt-3">
+                <label className="relative block">
+                  <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    inputMode="search"
+                    autoComplete="off"
+                    placeholder="Mahsulot qidirish…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="w-full rounded-full border border-stone-200/90 bg-white py-3.5 pl-12 pr-4 text-sm font-medium text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
               </div>
             ) : null}
-          </main>
+
+            <div className="border-b border-stone-100 pb-2">
+              {loadingCats ? (
+                <div className="px-4 py-2 text-sm font-medium text-muted">Yuklanmoqda…</div>
+              ) : categories.length === 0 ? (
+                <div className="px-4 py-2">
+                  <EmptyState
+                    emoji="📂"
+                    title="Kategoriyalar yo'q"
+                    lines={["Hozircha menyu bo'sh. Keyinroq qayta kiring."]}
+                    className="!py-6"
+                  />
+                </div>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide">
+                  {categories.map((cat, index) => {
+                    const active = String(cat._id) === String(activeId);
+                    const icon = categoryIcon(index);
+                    return (
+                      <button
+                        key={cat._id}
+                        type="button"
+                        onClick={() => {
+                          setProductsError(null);
+                          setActiveId(cat._id);
+                        }}
+                        className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold transition duration-200 active:scale-95 ${
+                          active
+                            ? 'border-primary bg-primary text-white shadow-md shadow-primary/20'
+                            : 'border-stone-200 bg-white text-ink shadow-sm hover:border-primary/30'
+                        }`}
+                      >
+                        <span className="text-base leading-none" aria-hidden>
+                          {icon}
+                        </span>
+                        <span className="max-w-[150px] truncate">{cat.name_uz}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {(categoriesError || productsError) && (
+              <div className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-800 ring-1 ring-red-200/80">
+                {categoriesError || productsError}
+              </div>
+            )}
+
+            <main className="px-4 pt-4">
+              {activeId ? (
+                <div key={activeId}>
+                  <CategoryProducts
+                    categoryId={activeId}
+                    qtyByProductId={qtyByProductId}
+                    pulseProductId={pulseProductId}
+                    onAddToCart={handleAddToCart}
+                    onChangeQty={onChangeQty}
+                    onProductFetchError={setProductsErrorStable}
+                  />
+                </div>
+              ) : null}
+            </main>
+          </div>
         </div>
       </div>
 
