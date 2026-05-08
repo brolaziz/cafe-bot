@@ -44,7 +44,7 @@ function ConfirmSheet({ open, title, description, confirmLabel, onConfirm, onCan
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,calc(56px+env(safe-area-inset-bottom)+0.75rem))] sm:px-5 sm:py-8"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
