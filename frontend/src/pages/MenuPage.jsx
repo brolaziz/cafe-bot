@@ -7,6 +7,10 @@ const CATEGORY_ICONS = ['☕', '🥐', '🍰', '🥤', '🍕', '🌮', '🥗', '
 
 const NAV_SAFE_BOTTOM = 'calc(56px + max(0.5rem, env(safe-area-inset-bottom)))';
 
+/** Banner: Unsplash (tarmoq) + gradient zaxira */
+const HERO_FOOD_IMAGE =
+  'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?auto=format&fit=crop&w=1200&q=80';
+
 function categoryIcon(index) {
   return CATEGORY_ICONS[index % CATEGORY_ICONS.length];
 }
@@ -483,6 +487,25 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
         className={`flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
         aria-hidden={isSearchMode}
       >
+        <section
+          className="relative isolate h-[180px] w-full shrink-0 overflow-hidden rounded-b-2xl bg-gradient-to-br from-neutral-900 via-ink to-primarydark shadow-[0_4px_20px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.08]"
+          aria-label="Menyu banner"
+        >
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `linear-gradient(to bottom, rgba(26,26,26,0.35), rgba(10,10,10,0.82)), url(${HERO_FOOD_IMAGE})`,
+            }}
+          />
+          <div className="relative flex h-full flex-col justify-end px-5 pb-5 pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">BUGUN</p>
+            <h2 className="mt-1.5 text-2xl font-extrabold leading-tight tracking-tight text-white">Yangi taomlar</h2>
+            <p className="mt-1 max-w-[280px] text-sm leading-snug text-white/85">
+              Tez yetkazib beramiz — mazali va issiq.
+            </p>
+          </div>
+        </section>
+
         <div className="mt-2 shrink-0 bg-surface shadow-[0_1px_0_rgba(0,0,0,0.06)]">
           <AppHeader
             end={
