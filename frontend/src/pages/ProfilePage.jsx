@@ -312,10 +312,10 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
   }
 
   return (
-    <div className="box-border flex min-h-[100dvh] flex-col bg-surface pb-[calc(56px+max(0.75rem,env(safe-area-inset-bottom)))]">
+    <div className="box-border flex min-h-screen flex-col bg-surface pb-24">
       <AppHeader end={null} />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scroll-smooth [-webkit-overflow-scrolling:touch]">
+      <div className="flex flex-col">
         <div className="px-4 pt-2">
           <div
             className="relative overflow-hidden rounded-[1.65rem] bg-gradient-to-br from-card via-card to-primary/[0.12] p-5 shadow-[0_12px_40px_rgba(0,0,0,0.07)] ring-1 ring-black/[0.05] backdrop-blur-xl animate-card-rise motion-reduce:animate-none"

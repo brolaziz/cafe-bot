@@ -15,7 +15,7 @@ export default function CartPage({ cart, onBrowseMenu, onOpenAddress, onCheckout
   const total = cart.reduce((s, line) => s + lineTotal(line), 0);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
+    <div className="flex min-h-screen flex-col bg-surface pb-24">
       <AppHeader end={null} />
 
       {cart.length === 0 ? (

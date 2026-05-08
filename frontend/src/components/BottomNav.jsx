@@ -8,7 +8,7 @@ const tabs = [
 export default function BottomNav({ activeTab, onChange, cartCount = 0 }) {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 mx-auto max-w-[480px] border-t border-stone-200/90 bg-card/95 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-[480px] border-t border-stone-200/90 bg-card/95 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-md"
       style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       aria-label="Asosiy menyu"
     >

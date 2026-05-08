@@ -46,7 +46,7 @@ export default function AddressPage() {
     'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
   return (
-    <div className="box-border flex min-h-[100dvh] flex-col bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
+    <div className="box-border flex min-h-screen flex-col bg-surface pb-24">
       <AppHeader end={null} />
 
       <div className="px-4 pt-3">

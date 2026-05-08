@@ -87,7 +87,7 @@ export default function App() {
 
   if (overlay === 'checkout') {
     return (
-      <div key="checkout" className="min-h-[100dvh] animate-page-slide">
+      <div key="checkout" className="animate-page-slide">
         <CheckoutPage
           cart={cart}
           tgUser={tgUser}
@@ -105,8 +105,8 @@ export default function App() {
   }
 
   return (
-    <div className="relative min-h-[100dvh]">
-      <div key={mainTab} className="min-h-[100dvh] animate-page-slide">
+    <div className="w-full">
+      <div key={mainTab} className="animate-page-slide">
         {mainTab === 'menu' && (
           <MenuPage
             cart={cart}

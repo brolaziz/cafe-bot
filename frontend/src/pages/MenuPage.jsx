@@ -482,12 +482,12 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
   }, [isSearchMode]);
 
   return (
-    <div className="relative box-border flex h-[100dvh] flex-col overflow-hidden bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
+    <div className="relative flex min-h-screen flex-col bg-surface pb-24">
       <div
-        className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
+        className={`relative flex flex-col ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
         aria-hidden={isSearchMode}
       >
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-hide">
+        <div className="flex w-full flex-col">
           <AppHeader
             end={
               <button
@@ -621,12 +621,12 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
           <button
             type="button"
             aria-label="Qidiruvni yopish"
-            className="fixed inset-x-0 top-0 z-[44] mx-auto max-w-[480px] border-0 bg-ink/35 backdrop-blur-[2px]"
+            className="fixed inset-x-0 top-0 z-[55] mx-auto max-w-[480px] border-0 bg-ink/35 backdrop-blur-[2px]"
             style={{ bottom: NAV_SAFE_BOTTOM }}
             onClick={clearSearch}
           />
           <div
-            className="fixed inset-x-0 z-[45] mx-auto flex max-w-[480px] flex-col overflow-hidden rounded-t-3xl bg-card shadow-[0_-12px_48px_rgba(0,0,0,0.18)] ring-1 ring-stone-200/90"
+            className="fixed inset-x-0 z-[60] mx-auto flex max-w-[480px] flex-col overflow-hidden rounded-t-3xl bg-card shadow-[0_-12px_48px_rgba(0,0,0,0.18)] ring-1 ring-stone-200/90"
             style={{
               bottom: NAV_SAFE_BOTTOM,
               top: 'max(4.5rem, env(safe-area-inset-top))',

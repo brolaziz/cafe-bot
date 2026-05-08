@@ -151,15 +151,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
         .toLowerCase() === 'p2p';
 
     return (
-      <div
-        className="bg-surface pb-24"
-        style={{
-          overflowY: 'scroll',
-          WebkitOverflowScrolling: 'touch',
-          height: '100vh',
-          position: 'relative',
-        }}
-      >
+      <div className="relative min-h-screen bg-surface pb-24">
         <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
         <div className="flex flex-col gap-5 px-4 pt-8">
           <div className="flex flex-col items-center text-center">
@@ -230,15 +222,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   }
 
   return (
-    <div
-      className="bg-surface pb-24"
-      style={{
-        overflowY: 'scroll',
-        WebkitOverflowScrolling: 'touch',
-        height: '100vh',
-        position: 'relative',
-      }}
-    >
+    <div className="relative min-h-screen bg-surface pb-24">
       <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
 
       <div className="px-4 pt-3">

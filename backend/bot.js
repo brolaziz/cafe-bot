@@ -701,9 +701,8 @@ async function handleAdminCallback(query) {
   const data = query.data;
   const chatId = query.message?.chat?.id;
   const userId = query.from?.id;
+  const messageId = query.message?.message_id;
   if (!data || chatId == null || userId == null || !isAdmin(userId)) return false;
-
-  if (!data.startsWith('adm_')) return false;
 
   const answer = async (text, alert = false) => {
     try {
@@ -712,6 +711,56 @@ async function handleAdminCallback(query) {
       /* ignore */
     }
   };
+
+  if (data === 'cleanup_confirm') {
+    try {
+      const deletedCount = await deleteOldOrders();
+      await answer();
+      const resultText = `✅ Tozalash tugadi! ${deletedCount} ta eski buyurtma o'chirildi.`;
+      if (messageId != null) {
+        try {
+          await botInstance.editMessageText(resultText, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: { inline_keyboard: [] },
+          });
+        } catch (_) {
+          await botInstance.sendMessage(chatId, resultText, { reply_markup: ADMIN_KEYBOARD_MAIN });
+        }
+      } else {
+        await botInstance.sendMessage(chatId, resultText, { reply_markup: ADMIN_KEYBOARD_MAIN });
+      }
+    } catch (err) {
+      console.error('cleanup_confirm:', err);
+      await answer('Xatolik', true);
+    }
+    return true;
+  }
+
+  if (data === 'cleanup_cancel') {
+    try {
+      await answer();
+      const cancelText = "❌ Tozalash bekor qilindi.";
+      if (messageId != null) {
+        try {
+          await botInstance.editMessageText(cancelText, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: { inline_keyboard: [] },
+          });
+        } catch (_) {
+          await botInstance.sendMessage(chatId, cancelText, { reply_markup: ADMIN_KEYBOARD_MAIN });
+        }
+      } else {
+        await botInstance.sendMessage(chatId, cancelText, { reply_markup: ADMIN_KEYBOARD_MAIN });
+      }
+    } catch (err) {
+      console.error('cleanup_cancel:', err);
+    }
+    return true;
+  }
+
+  if (!data.startsWith('adm_')) return false;
 
   const mGoto = data.match(/^adm_g_(.+)$/);
   const mPrice = data.match(/^adm_p_(.+)$/);
@@ -931,11 +980,19 @@ async function handleAdminMessage(msg) {
   const st = getState(userId);
 
   if (text === '/cleanup' || text === '🗑 Tozalash') {
-    const deletedCount = await deleteOldOrders();
     await botInstance.sendMessage(
       chatId,
-      `🗑 ${ORDER_RETENTION_DAYS} kundan eski buyurtmalar o'chirildi: ${deletedCount} ta`,
-      { reply_markup: ADMIN_KEYBOARD_MAIN }
+      `🗑 Haqiqatan ham ${ORDER_RETENTION_DAYS} kundan eski buyurtmalarni o'chirmoqchimisiz?`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "✅ Ha, o'chirish", callback_data: 'cleanup_confirm' },
+              { text: "❌ Yo'q", callback_data: 'cleanup_cancel' },
+            ],
+          ],
+        },
+      }
     );
     return true;
   }
