@@ -6,6 +6,25 @@ const { getBot, formatAdminOrderMessage } = require('../bot');
 
 const router = express.Router();
 
+router.get('/mine', async (req, res, next) => {
+  try {
+    const raw = req.query.telegram_user_id;
+    const telegram_user_id = typeof raw === 'string' ? Number(raw.trim()) : Number(raw);
+    if (!Number.isFinite(telegram_user_id)) {
+      res.status(400).json({ error: 'telegram_user_id kerak' });
+      return;
+    }
+
+    const orders = await Order.find({ telegram_user_id })
+      .sort({ created_at: -1 })
+      .limit(100)
+      .lean();
+    res.json(orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
 const ORDER_STATUSES = [
   'pending',
   'confirmed',

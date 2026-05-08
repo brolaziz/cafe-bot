@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import BottomNav from './components/BottomNav';
 import MenuPage from './pages/MenuPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
+import AddressPage from './pages/AddressPage';
+import ProfilePage from './pages/ProfilePage';
 
 function getTelegramUser() {
   return window.Telegram?.WebApp?.initDataUnsafe?.user ?? null;
 }
 
 export default function App() {
-  const [page, setPage] = useState('menu');
+  const [mainTab, setMainTab] = useState('menu');
+  const [overlay, setOverlay] = useState(null);
   const [cart, setCart] = useState([]);
 
   useEffect(() => {
@@ -57,7 +61,8 @@ export default function App() {
 
   const handleOrderSuccess = useCallback(() => {
     setCart([]);
-    setPage('menu');
+    setOverlay(null);
+    setMainTab('menu');
     const tg = window.Telegram?.WebApp;
     if (tg?.showAlert) {
       tg.showAlert("Buyurtma qabul qilindi. Tez orada bog'lanamiz.");
@@ -68,34 +73,49 @@ export default function App() {
 
   const tgUser = getTelegramUser();
 
-  return (
-    <div key={page} className="min-h-[100dvh] animate-page-slide">
-      {page === 'menu' && (
-        <MenuPage
-          cart={cart}
-          cartCount={cartCount}
-          onOpenCart={() => setPage('cart')}
-          onAddToCart={addToCart}
-          onChangeQty={changeQty}
-        />
-      )}
-      {page === 'cart' && (
+  if (overlay === 'cart') {
+    return (
+      <div key="cart" className="min-h-[100dvh] animate-page-slide">
         <CartPage
           cart={cart}
-          onBack={() => setPage('menu')}
-          onCheckout={() => setPage('checkout')}
+          onBack={() => setOverlay(null)}
+          onCheckout={() => setOverlay('checkout')}
           onChangeQty={changeQty}
           onRemove={removeLine}
         />
-      )}
-      {page === 'checkout' && (
+      </div>
+    );
+  }
+
+  if (overlay === 'checkout') {
+    return (
+      <div key="checkout" className="min-h-[100dvh] animate-page-slide">
         <CheckoutPage
           cart={cart}
           tgUser={tgUser}
-          onBack={() => setPage('cart')}
+          onBack={() => setOverlay('cart')}
           onSuccess={handleOrderSuccess}
         />
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-[100dvh]">
+      <div key={mainTab} className="min-h-[100dvh] animate-page-slide">
+        {mainTab === 'menu' && (
+          <MenuPage
+            cart={cart}
+            cartCount={cartCount}
+            onOpenCart={() => setOverlay('cart')}
+            onAddToCart={addToCart}
+            onChangeQty={changeQty}
+          />
+        )}
+        {mainTab === 'address' && <AddressPage />}
+        {mainTab === 'profile' && <ProfilePage tgUser={tgUser} />}
+      </div>
+      <BottomNav activeTab={mainTab} onChange={setMainTab} />
     </div>
   );
 }

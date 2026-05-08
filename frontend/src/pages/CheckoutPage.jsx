@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useId } from 'react';
 import { createOrder } from '../api';
 import AppHeader, { HeaderIconButton } from '../components/AppHeader';
-
-const TASHKENT_CENTER = [41.2995, 69.2401];
+import YandexAddressMap from '../components/YandexAddressMap';
+import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
 
 function cartTotal(cart) {
   return cart.reduce((s, line) => s + line.price * line.qty, 0);
@@ -26,14 +26,12 @@ function FloatingField({ id, label, children }) {
 }
 
 export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSuccess }) {
+  const mapDomId = useId().replace(/:/g, '');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [payment, setPayment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-
-  const mapRef = useRef(null);
-  const placemarkRef = useRef(null);
 
   const total = useMemo(() => cartTotal(cart), [cart]);
 
@@ -50,132 +48,15 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
     }
   }, [cart.length, onBack]);
 
-  const applyCoords = useCallback(async (coords, zoom) => {
-    const ymaps = window.ymaps;
-    if (!ymaps || !mapRef.current) return;
-
-    const map = mapRef.current;
-    if (placemarkRef.current) {
-      map.geoObjects.remove(placemarkRef.current);
-    }
-    placemarkRef.current = new ymaps.Placemark(
-      coords,
-      {},
-      { preset: 'islands#orangeCircleDotIcon' }
-    );
-    map.geoObjects.add(placemarkRef.current);
-    if (typeof zoom === 'number') {
-      map.setCenter(coords, zoom);
-    }
-
-    try {
-      const res = await ymaps.geocode(coords, { results: 1 });
-      const first = res.geoObjects.get(0);
-      const line = first ? first.getAddressLine() : '';
-      console.log('address:', line);
-      setAddress(line);
-    } catch (err) {
-      console.error('Yandex geocode error:', err);
-    }
-  }, [setAddress]);
-
   useEffect(() => {
-    let cancelled = false;
+    const p = loadUserPrefs();
+    if (p.phone) setPhone((prev) => prev || p.phone);
+    if (p.address) setAddress((prev) => prev || p.address);
+  }, []);
 
-    const initMap = () => {
-      if (cancelled) return;
-      if (!document.getElementById('yandex-map') || mapRef.current) return;
-      const ymaps = window.ymaps;
-      if (!ymaps) return;
-
-      ymaps.ready(() => {
-        if (cancelled || mapRef.current) return;
-        try {
-          const map = new ymaps.Map('yandex-map', {
-            center: TASHKENT_CENTER,
-            zoom: 13,
-            controls: ['zoomControl'],
-          });
-          mapRef.current = map;
-
-          map.events.add('click', (e) => {
-            const coords = e.get('coords');
-            void applyCoords(coords);
-          });
-        } catch (err) {
-          console.error('Yandex map init:', err);
-        }
-      });
-    };
-
-    const loadScript = () => {
-      if (cancelled) return;
-      if (window.ymaps) {
-        initMap();
-        return;
-      }
-
-      const existing = Array.from(document.getElementsByTagName('script')).find(
-        (s) => s.src && s.src.includes('api-maps.yandex.ru/2.1/')
-      );
-      if (existing) {
-        if (window.ymaps) {
-          initMap();
-        } else {
-          existing.addEventListener('load', () => {
-            if (!cancelled) initMap();
-          });
-        }
-        return;
-      }
-
-      const script = document.createElement('script');
-      const key = import.meta.env.VITE_YANDEX_MAPS_KEY ?? '';
-      script.src = `https://api-maps.yandex.ru/2.1/?apikey=${key}&lang=uz_UZ`;
-      script.async = true;
-      script.onload = () => {
-        if (!cancelled) initMap();
-      };
-      script.onerror = () => {
-        console.error('Yandex Maps script failed to load');
-      };
-      document.head.appendChild(script);
-    };
-
-    loadScript();
-
-    return () => {
-      cancelled = true;
-      placemarkRef.current = null;
-      if (mapRef.current) {
-        try {
-          mapRef.current.destroy();
-        } catch {
-          /* ignore */
-        }
-        mapRef.current = null;
-      }
-      const mapEl = document.getElementById('yandex-map');
-      if (mapEl) mapEl.innerHTML = '';
-    };
-  }, [applyCoords]);
-
-  function handleMyLocation() {
-    if (!navigator.geolocation) {
-      window.alert("Joylashuv ruxsati berilmadi");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = [pos.coords.latitude, pos.coords.longitude];
-        void applyCoords(coords, 16);
-      },
-      () => {
-        window.alert("Joylashuv ruxsati berilmadi");
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  }
+  const setAddressStable = useCallback((line) => {
+    setAddress(line);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -212,6 +93,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
     setSubmitting(true);
     try {
       await createOrder(payload);
+      saveUserPrefs({ phone: phone.trim(), address: address.trim() });
       onSuccess?.();
     } catch (err) {
       const msg = err.response?.data?.error || err.message || "Xatolik yuz berdi.";
@@ -253,32 +135,24 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
           />
         </FloatingField>
 
-        <div className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted">Xarita</span>
-          <button
-            type="button"
-            onClick={handleMyLocation}
-            className="mb-3 w-full rounded-2xl border border-stone-200 bg-card py-3 text-sm font-bold text-ink shadow-sm transition hover:border-primary/30 hover:bg-surface active:scale-[0.99]"
-          >
-            📍 Mening joylashuvim
-          </button>
-          <div
-            id="yandex-map"
-            className="mb-3 h-[250px] w-full overflow-hidden rounded-2xl bg-surface ring-1 ring-stone-200/80"
+        <YandexAddressMap
+          mapContainerId={mapDomId}
+          address={address}
+          onAddressChange={setAddressStable}
+        />
+
+        <div className="relative">
+          <textarea
+            id="checkout-address"
+            rows={3}
+            placeholder=" "
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className={`${fieldBase} min-h-[100px] resize-none peer pt-6`}
           />
-          <div className="relative">
-            <textarea
-              id="checkout-address"
-              rows={3}
-              placeholder=" "
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className={`${fieldBase} min-h-[100px] resize-none peer pt-6`}
-            />
-            <label htmlFor="checkout-address" className={textareaLabel}>
-              Yetkazib berish manzili
-            </label>
-          </div>
+          <label htmlFor="checkout-address" className={textareaLabel}>
+            Yetkazib berish manzili
+          </label>
         </div>
 
         <div>
