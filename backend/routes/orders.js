@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
-const { getBot, formatAdminOrderMessage } = require('../bot');
+const { getBot, formatAdminOrderMessage, appendYandexMapsLinkToAdminOrderMessage } = require('../bot');
 
 const router = express.Router();
 
@@ -81,27 +81,13 @@ router.delete('/:orderId', async (req, res, next) => {
 
 const ORDER_STATUSES = [
   'pending',
+  'paid',
   'confirmed',
   'preparing',
   'ready',
   'delivered',
   'cancelled',
 ];
-
-/** Admin xabarida 📍 Manzil qatoridan keyin Yandex havolasi */
-function appendYandexMapsLinkToAdminOrderMessage(message, address) {
-  const encoded = encodeURIComponent(String(address || '').trim());
-  const mapLine = `🗺 Xaritada ko'rish: https://yandex.uz/maps/?text=${encoded}`;
-  const lines = message.split('\n');
-  const out = [];
-  for (const line of lines) {
-    out.push(line);
-    if (line.startsWith('📍 Manzil:')) {
-      out.push(mapLine);
-    }
-  }
-  return out.join('\n');
-}
 
 function validateOrderBody(body) {
   const errors = [];
@@ -229,16 +215,26 @@ router.post('/', async (req, res, next) => {
           formatAdminOrderMessage(order),
           order.address
         );
-        await bot.sendMessage(adminChatId, text, {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ Qabul qilish', callback_data: `confirm_${order._id}` },
-                { text: '❌ Bekor qilish', callback_data: `cancel_${order._id}` },
+        const isP2p = String(order.payment_method || '')
+          .trim()
+          .toLowerCase() === 'p2p';
+        if (isP2p) {
+          await bot.sendMessage(
+            adminChatId,
+            `${text}\n\n💳 P2P: mijoz to'lov chekini bot orqali yuboradi.`
+          );
+        } else {
+          await bot.sendMessage(adminChatId, text, {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '✅ Qabul qilish', callback_data: `confirm_${order._id}` },
+                  { text: '❌ Bekor qilish', callback_data: `cancel_${order._id}` },
+                ],
               ],
-            ],
-          },
-        });
+            },
+          });
+        }
       } catch (notifyErr) {
         console.error('Telegram admin notify failed:', notifyErr.message || notifyErr);
       }

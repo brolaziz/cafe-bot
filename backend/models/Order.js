@@ -32,7 +32,7 @@ const orderSchema = new mongoose.Schema(
     payment_method: { type: String, required: true, trim: true },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'],
+      enum: ['pending', 'paid', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'],
       default: 'pending',
     },
     created_at: { type: Date, default: Date.now },

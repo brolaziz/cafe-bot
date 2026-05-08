@@ -69,10 +69,11 @@ export default function App() {
     setCart((prev) => prev.filter((p) => p.productId !== productId));
   }, []);
 
-  const handleOrderSuccess = useCallback(() => {
+  const handleOrderSuccess = useCallback((opts) => {
     setCart([]);
     setOverlay(null);
     setMainTab('menu');
+    if (opts?.skipAlert) return;
     const tg = window.Telegram?.WebApp;
     if (tg?.showAlert) {
       tg.showAlert("Buyurtma qabul qilindi. Tez orada bog'lanamiz.");

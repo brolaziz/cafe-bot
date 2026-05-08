@@ -6,6 +6,7 @@ import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
 
 const STATUS_UZ = {
   pending: 'Kutilmoqda',
+  paid: "To'langan",
   confirmed: 'Qabul qilindi',
   preparing: 'Tayyorlanmoqda',
   ready: 'Tayyor',
@@ -13,7 +14,7 @@ const STATUS_UZ = {
   cancelled: 'Bekor qilindi',
 };
 
-const ACTIVE_STATUSES = new Set(['pending', 'confirmed', 'preparing', 'ready']);
+const ACTIVE_STATUSES = new Set(['pending', 'paid', 'confirmed', 'preparing', 'ready']);
 
 function formatOrderWhen(iso) {
   if (!iso) return '—';
