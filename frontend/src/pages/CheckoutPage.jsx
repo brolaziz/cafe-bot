@@ -14,6 +14,8 @@ const fieldBase =
 const labelBase =
   'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
+const PHONE_REQUIRED_MSG = 'Telefon raqamini kiriting.';
+
 function FloatingField({ id, label, children }) {
   return (
     <div className="relative">
@@ -108,7 +110,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
     setError(null);
 
     if (!phone.trim()) {
-      setError('Telefon raqamini kiriting.');
+      setError(PHONE_REQUIRED_MSG);
       return;
     }
     if (!address.trim()) {
@@ -331,7 +333,13 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
             autoComplete="tel"
             placeholder=" "
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPhone(v);
+              if (error === PHONE_REQUIRED_MSG && v.trim()) {
+                setError(null);
+              }
+            }}
             className={fieldBase}
           />
         </FloatingField>
@@ -405,6 +413,15 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
             <span className="text-xl font-extrabold text-primary">{total.toLocaleString('uz-UZ')} so'm</span>
           </div>
         </div>
+
+        {error === PHONE_REQUIRED_MSG ? (
+          <div
+            role="alert"
+            className="rounded-2xl bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-950 ring-1 ring-amber-200/90"
+          >
+            {PHONE_REQUIRED_MSG}
+          </div>
+        ) : null}
 
         <button
           type="submit"
