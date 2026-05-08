@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#C8651B',
-        primarydark: '#A0521A',
+        primary: '#D4A574',
+        primarydark: '#95704A',
         surface: '#F5F5F5',
         card: '#FFFFFF',
         ink: '#1A1A1A',
@@ -14,7 +14,7 @@ export default {
       boxShadow: {
         header: '0 1px 0 rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)',
         card: '0 2px 12px rgba(0, 0, 0, 0.06)',
-        'card-hover': '0 8px 24px rgba(200, 101, 27, 0.12)',
+        'card-hover': '0 8px 24px rgba(212, 165, 116, 0.22)',
       },
       keyframes: {
         'page-slide': {
