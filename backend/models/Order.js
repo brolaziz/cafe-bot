@@ -44,9 +44,8 @@ const orderSchema = new mongoose.Schema(
       ],
       default: 'pending',
     },
-    created_at: { type: Date, default: Date.now },
   },
-  { timestamps: false }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model('Order', orderSchema);

@@ -153,9 +153,9 @@ async function findRecentPendingP2pOrder(telegramUserId) {
     telegram_user_id: telegramUserId,
     status: { $in: ['pending', 'pending_payment'] },
     payment_method: { $regex: /^p2p$/i },
-    created_at: { $gte: since },
+    createdAt: { $gte: since },
   })
-    .sort({ created_at: -1 })
+    .sort({ createdAt: -1 })
     .exec();
 }
 

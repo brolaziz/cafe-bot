@@ -35,6 +35,17 @@ const pressable =
   'transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50';
 
 function ConfirmSheet({ open, title, description, confirmLabel, onConfirm, onCancel, loading, tone = 'danger' }) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const confirmBtn =
@@ -42,24 +53,41 @@ function ConfirmSheet({ open, title, description, confirmLabel, onConfirm, onCan
       ? 'bg-rose-600 text-white shadow-md shadow-rose-600/25 hover:bg-rose-700'
       : 'bg-primary text-white shadow-md hover:bg-primarydark';
 
+  const overlayStyle = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 9999,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    transition: 'opacity 0.2s ease',
+    opacity: 1,
+  };
+
+  const panelStyle = {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '24px',
+    width: '100%',
+    maxWidth: '340px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    transition: 'opacity 0.2s ease',
+    opacity: 1,
+  };
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={overlayStyle}
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !loading) onCancel();
+      }}
     >
-      <button
-        type="button"
-        aria-label="Yopish"
-        className={`absolute inset-0 bg-ink/35 backdrop-blur-[6px] animate-modal-backdrop ${pressable}`}
-        onClick={() => {
-          if (!loading) onCancel();
-        }}
-      />
-      <div
-        className={`relative z-10 mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-[0_24px_64px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06] animate-modal-sheet motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none`}
-      >
+      <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
         <p id="confirm-title" className="text-lg font-bold tracking-tight text-ink">
           {title}
         </p>
@@ -138,7 +166,7 @@ function OrderCard({ order, index, telegramId, onRequestDelete, deletingId, onRe
               </span>
             )}
           </div>
-          <p className="mt-2 text-xs text-muted">{formatOrderWhen(order.created_at)}</p>
+          <p className="mt-2 text-xs text-muted">{formatOrderWhen(order.createdAt)}</p>
           <p className="mt-1.5 text-sm font-semibold leading-snug text-ink">
             {(order.items || []).map((it) => `${it.name} ×${it.qty}`).join(', ')}
           </p>
@@ -224,8 +252,8 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
 
   const sortedOrders = useMemo(() => {
     return [...orders].sort((a, b) => {
-      const ta = new Date(a.created_at || 0).getTime();
-      const tb = new Date(b.created_at || 0).getTime();
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
       return tb - ta;
     });
   }, [orders]);
@@ -526,7 +554,7 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
                               mode: 'one',
                               orderId: String(ord._id),
                               title: "Buyurtmani o'chirish?",
-                              description: `№${String(ord._id).slice(-6)} — ${formatOrderWhen(ord.created_at)}. Bu yozuv tarixdan olib tashlanadi.`,
+                              description: `№${String(ord._id).slice(-6)} — ${formatOrderWhen(ord.createdAt)}. Bu yozuv tarixdan olib tashlanadi.`,
                             });
                           }}
                         />

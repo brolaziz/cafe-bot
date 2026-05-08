@@ -42,7 +42,7 @@ router.get('/mine', async (req, res, next) => {
     }
 
     const orders = await Order.find({ telegram_user_id })
-      .sort({ created_at: -1 })
+      .sort({ createdAt: -1 })
       .limit(100)
       .lean();
     res.json(orders);
