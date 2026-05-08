@@ -22,6 +22,16 @@ export const createOrder = async (orderData) => {
   return res.data;
 };
 
+/** P2P chek rasmini yuklash (multipart, maydon: receipt) */
+export const uploadOrderReceipt = async (telegramUserId, orderId, file) => {
+  const form = new FormData();
+  form.append('receipt', file);
+  const res = await axios.post(`${BASE_URL}/api/orders/${orderId}/receipt`, form, {
+    params: { telegram_user_id: telegramUserId },
+  });
+  return res.data;
+};
+
 export const fetchMyOrders = async (telegramUserId) => {
   const res = await axios.get(`${BASE_URL}/api/orders/mine`, {
     params: { telegram_user_id: telegramUserId },

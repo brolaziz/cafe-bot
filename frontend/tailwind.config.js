@@ -46,6 +46,11 @@ export default {
           '0%, 100%': { transform: 'translateY(0) rotate(-2deg)' },
           '50%': { transform: 'translateY(-8px) rotate(2deg)' },
         },
+        'success-check': {
+          '0%': { transform: 'scale(0.5)', opacity: '0' },
+          '55%': { transform: 'scale(1.12)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
       },
       animation: {
         'page-slide': 'page-slide 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards',
@@ -55,6 +60,7 @@ export default {
         'card-rise': 'card-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both',
         'cart-bounce': 'cart-bounce 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)',
         'empty-bob': 'empty-bob 2.8s ease-in-out infinite',
+        'success-check': 'success-check 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both',
       },
     },
   },

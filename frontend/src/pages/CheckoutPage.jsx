@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, useId } from 'react';
-import { createOrder, fetchP2pCardPublic } from '../api';
+import { useCallback, useEffect, useMemo, useState, useId, useRef } from 'react';
+import { createOrder, fetchP2pCardPublic, uploadOrderReceipt } from '../api';
 import AppHeader, { HeaderIconButton } from '../components/AppHeader';
 import YandexAddressMap from '../components/YandexAddressMap';
 import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
@@ -31,9 +31,15 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [p2pSuccess, setP2pSuccess] = useState(false);
+  /** Buyurtma yaratilgandan keyin JSON (null = forma rejimi) */
+  const [completedOrder, setCompletedOrder] = useState(null);
   const [copyHint, setCopyHint] = useState('');
   const [p2pFromApi, setP2pFromApi] = useState({ card_number: '', card_owner: '' });
+  const receiptInputRef = useRef(null);
+  const [receiptUploading, setReceiptUploading] = useState(false);
+  const [receiptUploaded, setReceiptUploaded] = useState(false);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState('');
+  const [receiptError, setReceiptError] = useState('');
 
   const total = useMemo(() => cartTotal(cart), [cart]);
 
@@ -41,8 +47,6 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   const envCardOwner = (import.meta.env.VITE_CARD_OWNER || '').trim();
   const cardNumber = (p2pFromApi.card_number || envCardNumber).trim();
   const cardOwner = (p2pFromApi.card_owner || envCardOwner).trim();
-  const botUsername = (import.meta.env.VITE_BOT_USERNAME || '').trim().replace(/^@/, '');
-
   const tgUser =
     tgUserProp ??
     window.Telegram?.WebApp?.initDataUnsafe?.user ?? {
@@ -99,17 +103,6 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
     }
   }
 
-  function openBot() {
-    if (!botUsername) return;
-    const url = `https://t.me/${botUsername}`;
-    const tg = window.Telegram?.WebApp;
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(url);
-    } else {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
@@ -140,9 +133,9 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
     setSubmitting(true);
     try {
-      await createOrder(payload);
+      const order = await createOrder(payload);
       saveUserPrefs({ phone: phone.trim(), address: address.trim() });
-      setP2pSuccess(true);
+      setCompletedOrder(order);
     } catch (err) {
       const msg = err.response?.data?.error || err.message || "Xatolik yuz berdi.";
       setError(typeof msg === 'string' ? msg : "Buyurtma yuborilmadi.");
@@ -154,31 +147,144 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   const textareaLabel =
     'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
-  if (p2pSuccess) {
-    const botLabel = botUsername ? `@${botUsername}` : 'bot';
+  useEffect(() => {
+    return () => {
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    };
+  }, [receiptPreviewUrl]);
+
+  async function handleReceiptFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !completedOrder?._id) return;
+    if (!file.type.startsWith('image/')) {
+      setReceiptError('Faqat rasm tanlang.');
+      return;
+    }
+    setReceiptError('');
+    setReceiptUploading(true);
+    try {
+      await uploadOrderReceipt(tgUser.id, completedOrder._id, file);
+      setReceiptPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
+      setReceiptUploaded(true);
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || "Yuklash muvaffaqiyatsiz.";
+      setReceiptError(typeof msg === 'string' ? msg : "Xatolik.");
+    } finally {
+      setReceiptUploading(false);
+    }
+  }
+
+  if (completedOrder) {
+    const orderShort = String(completedOrder._id || '')
+      .slice(-6)
+      .toUpperCase();
+    const totalNum = Number(completedOrder.total_price);
+    const totalLabel = Number.isFinite(totalNum)
+      ? `${totalNum.toLocaleString('uz-UZ')} so'm`
+      : `${completedOrder.total_price} so'm`;
+    const isP2p =
+      String(completedOrder.payment_method || '')
+        .trim()
+        .toLowerCase() === 'p2p';
+
     return (
       <div className="flex min-h-[100dvh] flex-col bg-surface pb-8">
         <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
-        <div className="flex flex-1 flex-col gap-4 px-4 pt-6">
-          <div className="rounded-2xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]">
-            <p className="text-base font-bold text-ink">Buyurtma yaratildi</p>
-            <p className="mt-3 text-sm leading-relaxed text-muted">
-              Chek yoki skrinshot botga yuboring: <span className="font-semibold text-primarydark">{botLabel}</span>
-            </p>
-            <div className="mt-5 flex flex-col gap-3">
-              {botUsername ? (
-                <button type="button" onClick={openBot} className="btn-primary w-full">
-                  Botga o&apos;tish
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => onSuccess?.({ skipAlert: true })}
-                className="rounded-2xl border border-stone-200 bg-white py-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-[0.98]"
-              >
-                Menyuga qaytish
-              </button>
+        <div className="flex flex-1 flex-col gap-5 px-4 pt-8">
+          <div className="flex flex-col items-center text-center">
+            <div
+              className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 shadow-inner ring-4 ring-emerald-50"
+              aria-hidden
+            >
+              <span className="select-none text-5xl leading-none animate-success-check">✅</span>
             </div>
+            <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-ink">Buyurtma qabul qilindi!</h1>
+            <p className="mt-2 text-base font-bold text-primarydark">
+              Buyurtma #{orderShort}
+            </p>
+            <p className="mt-1 text-lg font-extrabold text-primary">{totalLabel}</p>
+          </div>
+
+          {isP2p ? (
+            <>
+              <div className="rounded-2xl border border-stone-200/90 bg-card p-4 shadow-sm ring-1 ring-black/[0.04]">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted">Karta ma&apos;lumoti</p>
+                {cardNumber ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <p className="min-w-0 flex-1 break-all font-mono text-sm font-bold text-ink">{cardNumber}</p>
+                    <button
+                      type="button"
+                      onClick={() => void copyCardNumber()}
+                      className="shrink-0 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-primarydark shadow-sm transition active:scale-95"
+                    >
+                      Nusxa
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-muted">Karta raqami sozlanmagan.</p>
+                )}
+                {cardOwner ? (
+                  <p className="mt-3 text-sm text-muted">
+                    Egasi: <span className="font-semibold text-ink">{cardOwner}</span>
+                  </p>
+                ) : null}
+                {copyHint ? <p className="mt-2 text-xs font-semibold text-primarydark">{copyHint}</p> : null}
+              </div>
+
+              <div className="rounded-2xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]">
+                <p className="text-sm font-bold text-ink">Chek yoki to&apos;lov skrinshotini yuklang</p>
+                <p className="mt-1 text-xs text-muted">Rasm admin Telegramga yuboriladi.</p>
+
+                <input
+                  ref={receiptInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={receiptUploaded || receiptUploading}
+                  onChange={(ev) => void handleReceiptFileChange(ev)}
+                />
+
+                {!receiptUploaded ? (
+                  <button
+                    type="button"
+                    disabled={receiptUploading}
+                    onClick={() => receiptInputRef.current?.click()}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 py-4 text-sm font-extrabold text-primarydark transition hover:bg-primary/10 disabled:opacity-60"
+                  >
+                    {receiptUploading ? 'Yuborilmoqda…' : '📎 Rasm yuklash'}
+                  </button>
+                ) : null}
+
+                {receiptError ? (
+                  <p className="mt-3 text-sm font-medium text-red-700">{receiptError}</p>
+                ) : null}
+
+                {receiptUploaded && receiptPreviewUrl ? (
+                  <div className="mt-4 flex flex-col items-center gap-3">
+                    <img
+                      src={receiptPreviewUrl}
+                      alt="Chek"
+                      className="h-36 w-auto max-w-full rounded-xl border border-stone-200 object-contain shadow-sm"
+                    />
+                    <p className="text-sm font-bold text-emerald-700">✅ Yuborildi</p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+
+          <div className="mt-auto flex flex-col gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => onSuccess?.({ skipAlert: true })}
+              className="btn-primary w-full"
+            >
+              Menyuga qaytish
+            </button>
           </div>
         </div>
       </div>

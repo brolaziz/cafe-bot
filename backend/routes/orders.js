@@ -1,10 +1,55 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
+const multer = require('multer');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { getBot, formatAdminOrderMessage, appendYandexMapsLinkToAdminOrderMessage } = require('../bot');
 
 const router = express.Router();
+
+const receiptsDir = path.join(__dirname, '..', 'uploads', 'receipts');
+
+function ensureReceiptsDir() {
+  try {
+    fs.mkdirSync(receiptsDir, { recursive: true });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+function unlinkSafe(filePath) {
+  if (!filePath) return;
+  try {
+    fs.unlinkSync(filePath);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
+const receiptStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    ensureReceiptsDir();
+    cb(null, receiptsDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '') || '.jpg';
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+
+const receiptUpload = multer({
+  storage: receiptStorage,
+  limits: { fileSize: 12 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+      cb(new Error('Faqat rasm fayli qabul qilinadi'));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 function parseTelegramUserId(raw) {
   const telegram_user_id = typeof raw === 'string' ? Number(raw.trim()) : Number(raw);
@@ -78,6 +123,108 @@ router.delete('/:orderId', async (req, res, next) => {
     next(err);
   }
 });
+
+/**
+ * Mini-appdan P2P chek rasmini qabul qiladi, admin chatga yuboradi (inline tugmalar bilan).
+ * POST multipart: maydon nomi "receipt". Query: telegram_user_id
+ */
+router.post(
+  '/:orderId/receipt',
+  (req, res, next) => {
+    receiptUpload.single('receipt')(req, res, (err) => {
+      if (err) {
+        const msg =
+          err instanceof multer.MulterError ? err.message : String(err.message || 'Yuklash xatosi');
+        res.status(400).json({ error: msg });
+        return;
+      }
+      next();
+    });
+  },
+  async (req, res, next) => {
+    const filePath = req.file?.path;
+
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "receipt maydoni kerak (multipart image)" });
+        return;
+      }
+
+      const telegram_user_id = parseTelegramUserId(req.query.telegram_user_id);
+      if (telegram_user_id === null) {
+        unlinkSafe(filePath);
+        res.status(400).json({ error: 'telegram_user_id kerak' });
+        return;
+      }
+
+      const { orderId } = req.params;
+      if (!mongoose.isValidObjectId(String(orderId))) {
+        unlinkSafe(filePath);
+        res.status(400).json({ error: "Noto'g'ri buyurtma identifikatori" });
+        return;
+      }
+
+      const order = await Order.findOne({
+        _id: orderId,
+        telegram_user_id,
+      }).exec();
+
+      if (!order) {
+        unlinkSafe(filePath);
+        res.status(404).json({ error: 'Buyurtma topilmadi yoki sizga tegishli emas' });
+        return;
+      }
+
+      if (String(order.payment_method || '').trim().toLowerCase() !== 'p2p') {
+        unlinkSafe(filePath);
+        res.status(400).json({ error: 'Faqat P2P buyurtma uchun' });
+        return;
+      }
+
+      if (order.status !== 'pending') {
+        unlinkSafe(filePath);
+        res.status(400).json({ error: 'Bu buyurtma uchun chek yuborish mumkin emas' });
+        return;
+      }
+
+      const bot = getBot();
+      const adminChatId = process.env.ADMIN_CHAT_ID;
+      if (!bot || !adminChatId) {
+        unlinkSafe(filePath);
+        res.status(503).json({ error: "Telegram admin sozlanmagan (ADMIN_CHAT_ID)" });
+        return;
+      }
+
+      const username = order.telegram_username && String(order.telegram_username).trim();
+      const userLine = username ? `@${username}` : `(id: ${order.telegram_user_id})`;
+      const orderShort = String(order._id).slice(-6);
+      const caption = [
+        "💳 P2P TO'LOV CHEKI",
+        `👤 Mijoz: ${userLine}`,
+        `📋 Buyurtma: #${orderShort}`,
+        `💰 Summa: ${order.total_price} so'm`,
+      ].join('\n');
+
+      await bot.sendPhoto(adminChatId, filePath, {
+        caption,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ Tasdiqlash', callback_data: `p2pok_${order._id}` },
+              { text: '❌ Rad etish', callback_data: `p2px_${order._id}` },
+            ],
+          ],
+        },
+      });
+
+      unlinkSafe(filePath);
+      res.json({ ok: true });
+    } catch (err) {
+      unlinkSafe(filePath);
+      next(err);
+    }
+  }
+);
 
 const ORDER_STATUSES = [
   'pending',
