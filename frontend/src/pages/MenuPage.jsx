@@ -17,12 +17,15 @@ function shouldUseImagePlaceholder(url) {
   return u.includes('example.com');
 }
 
-/** "Katalog" yig'im kategoriyasini menyu chiplarida ko'rsatmaymiz */
+/** Katalog / Kategoriyalar kabi yig'ma yozuvlarini API ro'yxatidan chiqarib, faqat haqiqiy kategoriyalar qoladi */
+const EXCLUDED_MENU_CATEGORY_NAMES = new Set(['katalog', 'kategoriyalar']);
+
 function isListedMenuCategory(cat) {
   const raw = (cat.name_uz || '').trim().toLowerCase();
   if (!raw) return false;
   const stripped = raw.replace(/^[^\p{L}]+/u, '');
-  return stripped !== 'katalog';
+  if (!stripped) return false;
+  return !EXCLUDED_MENU_CATEGORY_NAMES.has(stripped);
 }
 
 /** Qidiruv: bo'sh joy bilan ajratilgan har bir so'z nomda uchraydi */
@@ -480,19 +483,6 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
         className={`flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
         aria-hidden={isSearchMode}
       >
-        <section className="relative mx-4 mt-2 shrink-0 overflow-hidden rounded-2xl shadow-card ring-1 ring-black/[0.05]">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: 'url(/food-bg.png)' }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/92 via-primary/85 to-primarydark/90" />
-          <div className="relative px-5 py-5 text-white">
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/80">Bugun</p>
-            <h2 className="mt-1 text-2xl font-extrabold leading-tight">Yangi taomlar</h2>
-            <p className="mt-1 max-w-[240px] text-sm text-white/90">Tez yetkazib beramiz — mazali va issiq.</p>
-          </div>
-        </section>
-
         <div className="mt-2 shrink-0 bg-surface shadow-[0_1px_0_rgba(0,0,0,0.06)]">
           <AppHeader
             end={
