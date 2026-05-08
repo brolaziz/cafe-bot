@@ -8,7 +8,8 @@ const STATUS_UZ = {
   pending: 'Kutilmoqda',
   pending_payment: "To'lov kutilmoqda",
   receipt_sent: 'Chek yuborildi (tasdiq kutilmoqda)',
-  paid: "To'langan",
+  /** Eski yozuvlar / boshqa oqimlar */
+  paid: "Qabul qilindi",
   confirmed: 'Qabul qilindi',
   preparing: 'Tayyorlanmoqda',
   ready: 'Tayyor',

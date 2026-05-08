@@ -276,7 +276,8 @@ async function handleReceiptFlowCallback(query) {
     const emptyKeyboard = { inline_keyboard: [] };
 
     if (ok) {
-      order.status = 'paid';
+      /** Mini-appda «Tayyorlanmoqda» ko'rinishi uchun (tayyor tugmasi gacha) */
+      order.status = 'preparing';
       await order.save();
 
       const suffix = "\n\n✅ To'lov tasdiqlandi";
@@ -299,14 +300,20 @@ async function handleReceiptFlowCallback(query) {
 
       await botInstance.sendMessage(
         order.telegram_user_id,
-        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz tayyorlanmoqda 🍽"
+        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz qabul qilindi va tayyorlanmoqda. Tayyor bo'lganimizda shu yerda (Telegram) xabar beramiz 🍽"
       );
 
       const adminNotify = appendYandexMapsLinkToAdminOrderMessage(
         formatAdminOrderMessage(order),
         order.address
       );
-      await botInstance.sendMessage(chatId, `${adminNotify}\n\n✅ P2P to'lov qabul qilindi.`);
+      await botInstance.sendMessage(chatId, `${adminNotify}\n\n✅ P2P to'lov qabul qilindi.`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '✅ Buyurtma tayyor (mijozga xabar)', callback_data: `order_ready_${order._id}` }],
+          ],
+        },
+      });
       return true;
     }
 
@@ -345,6 +352,100 @@ async function handleReceiptFlowCallback(query) {
     }
     return true;
   }
+}
+
+const ORDER_READY_FROM_STATUSES = ['paid', 'confirmed', 'preparing'];
+
+/**
+ * Admin buyurtmani tayyor deb mijozga xabar yuboradi.
+ * callback_data: order_ready_ORDERID
+ * @returns {Promise<boolean>}
+ */
+async function handleOrderReadyCallback(query) {
+  const data = query.data;
+  const m = data && /^order_ready_(.+)$/.exec(data);
+  if (!m) return false;
+
+  const uid = query.from?.id;
+  if (uid == null || !isAdmin(uid)) {
+    try {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Faqat admin', show_alert: false });
+    } catch (_) {
+      /* ignore */
+    }
+    return true;
+  }
+
+  const orderId = m[1];
+  const msg = query.message;
+  const chatId = msg?.chat?.id;
+  const messageId = msg?.message_id;
+  const prevText = msg?.text != null ? String(msg.text) : '';
+
+  if (!mongoose.isValidObjectId(orderId) || chatId == null || messageId == null) {
+    try {
+      await botInstance.answerCallbackQuery(query.id, { text: "Noto'g'ri ma'lumot", show_alert: false });
+    } catch (_) {
+      /* ignore */
+    }
+    return true;
+  }
+
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Buyurtma topilmadi', show_alert: false });
+      return true;
+    }
+
+    if (order.status === 'ready' || order.status === 'delivered') {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Allaqachon tayyor deb yuborilgan', show_alert: false });
+      return true;
+    }
+
+    if (!ORDER_READY_FROM_STATUSES.includes(order.status)) {
+      await botInstance.answerCallbackQuery(query.id, {
+        text: `Bu holatda mumkin emas (${order.status})`,
+        show_alert: false,
+      });
+      return true;
+    }
+
+    order.status = 'ready';
+    await order.save();
+
+    let customerNotified = true;
+    try {
+      await botInstance.sendMessage(
+        order.telegram_user_id,
+        "✅ Buyurtmangiz tayyor! Kafeda olib ketishingiz yoki yetkazib berish mumkin. Rahmat! ☕"
+      );
+    } catch (sendErr) {
+      customerNotified = false;
+      console.warn('order_ready customer notify:', sendErr?.message || sendErr);
+    }
+
+    const suffix = customerNotified
+      ? '\n\n✅ Mijozga «buyurtma tayyor» xabari yuborildi.'
+      : "\n\n⚠️ Holat «tayyor» saqlandi, lekin mijozga Telegram xabari yuborilmadi (bot bloklangan bo'lishi mumkin).";
+    const newText = (prevText || '') + suffix;
+
+    await botInstance.editMessageText(newText, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: { inline_keyboard: [] },
+    });
+
+    await botInstance.answerCallbackQuery(query.id);
+  } catch (err) {
+    console.error('handleOrderReadyCallback:', err);
+    try {
+      await botInstance.answerCallbackQuery(query.id, { text: 'Xatolik', show_alert: false });
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return true;
 }
 
 /**
@@ -405,7 +506,7 @@ async function handleP2pReceiptCallback(query) {
     const emptyKeyboard = { inline_keyboard: [] };
 
     if (p2pOk) {
-      order.status = 'paid';
+      order.status = 'preparing';
       await order.save();
 
       const suffix = "\n\n✅ To'lov tasdiqlandi";
@@ -428,14 +529,20 @@ async function handleP2pReceiptCallback(query) {
 
       await botInstance.sendMessage(
         order.telegram_user_id,
-        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz tayyorlanmoqda 🍽"
+        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz qabul qilindi va tayyorlanmoqda. Tayyor bo'lganimizda shu yerda (Telegram) xabar beramiz 🍽"
       );
 
       const adminNotify = appendYandexMapsLinkToAdminOrderMessage(
         formatAdminOrderMessage(order),
         order.address
       );
-      await botInstance.sendMessage(chatId, `${adminNotify}\n\n✅ P2P to'lov qabul qilindi.`);
+      await botInstance.sendMessage(chatId, `${adminNotify}\n\n✅ P2P to'lov qabul qilindi.`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '✅ Buyurtma tayyor (mijozga xabar)', callback_data: `order_ready_${order._id}` }],
+          ],
+        },
+      });
       return true;
     }
 
@@ -1284,6 +1391,9 @@ function initBot() {
     const p2pHandled = await handleP2pReceiptCallback(query);
     if (p2pHandled) return;
 
+    const orderReadyHandled = await handleOrderReadyCallback(query);
+    if (orderReadyHandled) return;
+
     const data = query.data;
     const chatId = query.message?.chat?.id;
     const messageId = query.message?.message_id;
@@ -1342,10 +1452,27 @@ function initBot() {
       const suffix = confirmMatch ? '\n\n✅ Qabul qilindi' : '\n\n❌ Bekor qilindi';
       const newText = (prevText || '') + suffix;
 
+      if (confirmMatch) {
+        try {
+          await botInstance.sendMessage(
+            order.telegram_user_id,
+            "✅ Buyurtmangiz qabul qilindi! Tayyor bo'lganimizda shu yerda (Telegram) xabar beramiz 🍽"
+          );
+        } catch (_) {
+          /* mijoz botni bloklagan bo'lishi mumkin */
+        }
+      }
+
       await botInstance.editMessageText(newText, {
         chat_id: chatId,
         message_id: messageId,
-        reply_markup: { inline_keyboard: [] },
+        reply_markup: confirmMatch
+          ? {
+              inline_keyboard: [
+                [{ text: '✅ Buyurtma tayyor (mijozga xabar)', callback_data: `order_ready_${orderId}` }],
+              ],
+            }
+          : { inline_keyboard: [] },
       });
 
       await botInstance.answerCallbackQuery(query.id);
