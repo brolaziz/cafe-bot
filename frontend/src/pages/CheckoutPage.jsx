@@ -14,10 +14,11 @@ const fieldBase =
 const labelBase =
   'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
-/** Scroll: min balandlik + vertikal scroll; pastki bo‘sh joy (pb-20 ≈ nav + xavfsiz zona) */
-const checkoutPageScrollStyle = {
+/** Scroll qatlami: minHeight 100vh, overflowY auto (+ pb-20 — pastki nav, ~80px) */
+const checkoutPageShellStyle = {
   minHeight: '100vh',
   overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
 };
 
 function FloatingField({ id, label, children }) {
@@ -198,7 +199,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
         .toLowerCase() === 'p2p';
 
     return (
-      <div className="bg-surface pb-20" style={{ ...checkoutPageScrollStyle, paddingBottom: '80px' }}>
+      <div className="bg-surface pb-20" style={checkoutPageShellStyle}>
         <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
         <div className="flex flex-col gap-5 px-4 pt-8">
           <div className="flex flex-col items-center text-center">
@@ -298,7 +299,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   }
 
   return (
-    <div className="bg-surface pb-20" style={checkoutPageScrollStyle}>
+    <div className="bg-surface pb-20" style={checkoutPageShellStyle}>
       <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
 
       <div className="px-4 pt-3">
