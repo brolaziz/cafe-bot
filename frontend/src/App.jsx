@@ -20,6 +20,12 @@ export default function App() {
     if (tg) {
       tg.ready();
       tg.expand();
+      const safeTop = Number(tg.safeAreaInset?.top) || 0;
+      const contentTop = Number(tg.contentSafeAreaInset?.top) || 0;
+      const topPx = Math.max(safeTop, contentTop);
+      document.documentElement.style.setProperty('--tg-safe-area-top', `${topPx}px`);
+    } else {
+      document.documentElement.style.setProperty('--tg-safe-area-top', '0px');
     }
   }, []);
 

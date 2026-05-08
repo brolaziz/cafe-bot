@@ -13,7 +13,7 @@ export default function EmptyState({
       className={`relative overflow-hidden rounded-2xl border border-stone-200/80 bg-gradient-to-br from-card via-card to-primary/[0.04] px-5 py-10 text-center shadow-card ring-1 ring-black/[0.04] ${className}`}
     >
       <div className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-primary/10 blur-2xl" />
-      <div className="pointer-events-none absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-amber-300/15 blur-2xl" />
+      <div className="pointer-events-none absolute -bottom-4 -left-4 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
 
       <div className="relative flex flex-col items-center gap-2">
         <div

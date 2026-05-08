@@ -6,11 +6,18 @@ const { getBot, formatAdminOrderMessage } = require('../bot');
 
 const router = express.Router();
 
+function parseTelegramUserId(raw) {
+  const telegram_user_id = typeof raw === 'string' ? Number(raw.trim()) : Number(raw);
+  if (!Number.isFinite(telegram_user_id)) {
+    return null;
+  }
+  return telegram_user_id;
+}
+
 router.get('/mine', async (req, res, next) => {
   try {
-    const raw = req.query.telegram_user_id;
-    const telegram_user_id = typeof raw === 'string' ? Number(raw.trim()) : Number(raw);
-    if (!Number.isFinite(telegram_user_id)) {
+    const telegram_user_id = parseTelegramUserId(req.query.telegram_user_id);
+    if (telegram_user_id === null) {
       res.status(400).json({ error: 'telegram_user_id kerak' });
       return;
     }
@@ -20,6 +27,53 @@ router.get('/mine', async (req, res, next) => {
       .limit(100)
       .lean();
     res.json(orders);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Barcha buyurtmalarni o'chirish (faqat o'sha foydalanuvchining) */
+router.delete('/mine', async (req, res, next) => {
+  try {
+    const telegram_user_id = parseTelegramUserId(req.query.telegram_user_id);
+    if (telegram_user_id === null) {
+      res.status(400).json({ error: 'telegram_user_id kerak' });
+      return;
+    }
+
+    const result = await Order.deleteMany({ telegram_user_id });
+    res.json({ ok: true, deletedCount: result.deletedCount ?? 0 });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Bitta buyurtmani o'chirish */
+router.delete('/:orderId', async (req, res, next) => {
+  try {
+    const telegram_user_id = parseTelegramUserId(req.query.telegram_user_id);
+    if (telegram_user_id === null) {
+      res.status(400).json({ error: 'telegram_user_id kerak' });
+      return;
+    }
+
+    const { orderId } = req.params;
+    if (!mongoose.isValidObjectId(String(orderId))) {
+      res.status(400).json({ error: "Noto'g'ri buyurtma identifikatori" });
+      return;
+    }
+
+    const deleted = await Order.findOneAndDelete({
+      _id: orderId,
+      telegram_user_id,
+    }).lean();
+
+    if (!deleted) {
+      res.status(404).json({ error: 'Buyurtma topilmadi yoki sizga tegishli emas' });
+      return;
+    }
+
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

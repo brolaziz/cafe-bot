@@ -170,30 +170,28 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
               <img
                 src="/payme.png"
                 alt="Payme"
-                className="h-12 w-auto max-w-[92%] object-contain"
-                width={140}
-                height={48}
+                className="h-10 w-auto max-w-[92%] object-contain"
+                width={120}
+                height={40}
               />
               <span className="text-xs font-bold text-ink">Payme</span>
             </button>
             <button
               type="button"
               onClick={() => setPayment('Click')}
-              className={`flex min-h-[130px] flex-col items-center justify-center gap-2 rounded-2xl border-2 bg-card p-3 ${
+              className={`flex min-h-[130px] flex-col items-center justify-center gap-2 rounded-2xl border-2 bg-card p-4 ${
                 payment === 'Click'
                   ? 'border-primary shadow-md ring-2 ring-primary/20'
                   : 'border-stone-200/80 hover:border-primary/35'
               }`}
             >
-              <div className="flex min-h-[6.5rem] w-full max-w-[180px] items-center justify-center overflow-visible py-1">
-                <img
-                  src="/click.png"
-                  alt="Click"
-                  className="h-14 w-auto max-w-[95%] origin-center scale-[1.72] object-contain object-center"
-                  width={220}
-                  height={88}
-                />
-              </div>
+              <img
+                src="/click.png"
+                alt="Click"
+                className="h-10 w-auto max-w-[92%] object-contain"
+                width={120}
+                height={40}
+              />
               <span className="text-xs font-bold text-ink">Click</span>
             </button>
           </div>

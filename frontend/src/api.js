@@ -23,3 +23,17 @@ export const fetchMyOrders = async (telegramUserId) => {
   });
   return res.data;
 };
+
+export const deleteMyOrder = async (telegramUserId, orderId) => {
+  const res = await axios.delete(`${BASE_URL}/api/orders/${orderId}`, {
+    params: { telegram_user_id: telegramUserId },
+  });
+  return res.data;
+};
+
+export const deleteAllMyOrders = async (telegramUserId) => {
+  const res = await axios.delete(`${BASE_URL}/api/orders/mine`, {
+    params: { telegram_user_id: telegramUserId },
+  });
+  return res.data;
+};
