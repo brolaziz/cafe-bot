@@ -45,6 +45,8 @@ const orderSchema = new mongoose.Schema(
       ],
       default: 'pending',
     },
+    /** P2P: mijoz to'lov ekranidan chiqishi haqida adminga bir marta xabar yuborilgan */
+    p2p_dismiss_notified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

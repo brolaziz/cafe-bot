@@ -145,6 +145,32 @@ function formatP2pNewPendingPaymentAdminMessage(order) {
   return appendYandexMapsLinkToAdminOrderMessage(lines.join('\n'), order.address);
 }
 
+/** Mijoz P2P kutilayotgan buyurtmani mini-appdan o'chirganda */
+function formatP2pPendingDeletedByClientAdminMessage(order) {
+  const username = order.telegram_username && String(order.telegram_username).trim();
+  const userLine = username ? `@${username}` : '—';
+  const lines = [
+    "⚠️ P2P: mijoz to'lov kutilayotgan buyurtmani o'chirdi (chek yuborilmagan).",
+    `📋 #${order._id}`,
+    `👤 ${userLine} · 📞 ${order.phone}`,
+    `💰 ${order.total_price} so'm`,
+  ];
+  return lines.join('\n');
+}
+
+/** Mijoz to'lov/chek ko'rsatmalari ekranidan chiqib ketdi (buyurtma hali DB da) */
+function formatP2pCheckoutDismissedAdminMessage(order) {
+  const username = order.telegram_username && String(order.telegram_username).trim();
+  const userLine = username ? `@${username}` : '—';
+  const lines = [
+    "⚠️ P2P: mijoz to'lov qadamlaridan chiqdi (chek hali yuborilmagan; buyurtma kutilmoqda).",
+    `📋 #${order._id}`,
+    `👤 ${userLine} · 📞 ${order.phone}`,
+    `💰 ${order.total_price} so'm`,
+  ];
+  return lines.join('\n');
+}
+
 const P2P_RECEIPT_WINDOW_MS = 30 * 60 * 1000;
 
 async function findRecentPendingP2pOrder(telegramUserId) {
@@ -1518,6 +1544,8 @@ module.exports = {
   formatAdminOrderMessage,
   appendYandexMapsLinkToAdminOrderMessage,
   formatP2pNewPendingPaymentAdminMessage,
+  formatP2pPendingDeletedByClientAdminMessage,
+  formatP2pCheckoutDismissedAdminMessage,
 };
 Object.defineProperty(module.exports, 'bot', {
   enumerable: true,

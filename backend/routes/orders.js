@@ -9,6 +9,8 @@ const {
   formatAdminOrderMessage,
   appendYandexMapsLinkToAdminOrderMessage,
   formatP2pNewPendingPaymentAdminMessage,
+  formatP2pPendingDeletedByClientAdminMessage,
+  formatP2pCheckoutDismissedAdminMessage,
 } = require('../bot');
 
 const router = express.Router();
@@ -82,17 +84,93 @@ router.delete('/:orderId', async (req, res, next) => {
       return;
     }
 
-    const deleted = await Order.findOneAndDelete({
+    const order = await Order.findOne({
       _id: orderId,
       telegram_user_id,
-    }).lean();
+    }).exec();
 
-    if (!deleted) {
+    if (!order) {
       res.status(404).json({ error: 'Buyurtma topilmadi yoki sizga tegishli emas' });
       return;
     }
 
+    const isP2pPending =
+      String(order.payment_method || '').trim().toLowerCase() === 'p2p' &&
+      order.status === 'pending_payment';
+
+    if (isP2pPending) {
+      const bot = getBot();
+      const adminChatId = process.env.ADMIN_CHAT_ID;
+      if (bot && adminChatId) {
+        try {
+          await bot.sendMessage(adminChatId, formatP2pPendingDeletedByClientAdminMessage(order));
+        } catch (notifyErr) {
+          console.error('Telegram admin (P2P o\'chirish) xabar yuborilmadi:', notifyErr.message || notifyErr);
+        }
+      }
+    }
+
+    await Order.deleteOne({ _id: orderId, telegram_user_id });
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * P2P: mijoz to'lov ko'rsatmalari ekranidan chiqdi / mini-app yopildi — adminga bir marta.
+ * POST; query: telegram_user_id. sendBeacon uchun ham ishlatiladi.
+ */
+router.post('/:orderId/p2p-dismiss-signal', async (req, res, next) => {
+  try {
+    const telegram_user_id = parseTelegramUserId(req.query.telegram_user_id);
+    if (telegram_user_id === null) {
+      res.status(400).json({ error: 'telegram_user_id kerak' });
+      return;
+    }
+
+    const { orderId } = req.params;
+    if (!mongoose.isValidObjectId(String(orderId))) {
+      res.status(400).json({ error: "Noto'g'ri buyurtma identifikatori" });
+      return;
+    }
+
+    const bot = getBot();
+    const adminChatId = process.env.ADMIN_CHAT_ID;
+    if (!bot || !adminChatId) {
+      res.status(204).end();
+      return;
+    }
+
+    const order = await Order.findOneAndUpdate(
+      {
+        _id: orderId,
+        telegram_user_id,
+        payment_method: { $regex: /^p2p$/i },
+        status: 'pending_payment',
+        $or: [{ p2p_dismiss_notified: false }, { p2p_dismiss_notified: { $exists: false } }],
+      },
+      { $set: { p2p_dismiss_notified: true } },
+      { new: true }
+    ).exec();
+
+    if (!order) {
+      res.status(204).end();
+      return;
+    }
+
+    try {
+      await bot.sendMessage(adminChatId, formatP2pCheckoutDismissedAdminMessage(order));
+    } catch (sendErr) {
+      console.error('Telegram admin (P2P dismiss) xabar yuborilmadi:', sendErr.message || sendErr);
+      try {
+        await Order.updateOne({ _id: orderId }, { $set: { p2p_dismiss_notified: false } });
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

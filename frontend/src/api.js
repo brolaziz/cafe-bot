@@ -22,6 +22,23 @@ export const createOrder = async (orderData) => {
   return res.data;
 };
 
+/**
+ * P2P pending: mijoz to'lov sahifasidan chiqdi — adminga bir marta (sendBeacon / keepalive).
+ * @param {{ preferBeacon?: boolean }} [opts]
+ */
+export function signalP2pCheckoutDismiss(telegramUserId, orderId, opts = {}) {
+  const url = `${BASE_URL}/api/orders/${orderId}/p2p-dismiss-signal?telegram_user_id=${encodeURIComponent(telegramUserId)}`;
+  if (opts.preferBeacon && typeof navigator.sendBeacon === 'function') {
+    try {
+      const ok = navigator.sendBeacon(url, new Blob([''], { type: 'text/plain' }));
+      if (ok) return Promise.resolve();
+    } catch {
+      /* fetch fallback */
+    }
+  }
+  return fetch(url, { method: 'POST', keepalive: true, body: '' }).catch(() => {});
+}
+
 /** P2P chek rasmini yuklash (multipart, maydon: receipt) */
 export const uploadOrderReceipt = async (telegramUserId, orderId, file) => {
   const form = new FormData();

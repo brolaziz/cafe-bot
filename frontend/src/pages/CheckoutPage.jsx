@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useId } from 'react';
-import { createOrder, fetchP2pCardPublic } from '../api';
+import { createOrder, fetchP2pCardPublic, signalP2pCheckoutDismiss } from '../api';
 import AppHeader, { HeaderIconButton } from '../components/AppHeader';
 import YandexAddressMap from '../components/YandexAddressMap';
 import { loadUserPrefs, PICKUP_FROM_CAFE_LABEL, saveUserPrefs } from '../lib/userPrefs';
@@ -80,6 +80,36 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
       onBack();
     }
   }, [cart.length, onBack]);
+
+  const handleHeaderBack = useCallback(() => {
+    if (completedOrder) {
+      const p2p =
+        String(completedOrder.payment_method || '')
+          .trim()
+          .toLowerCase() === 'p2p';
+      if (p2p && completedOrder.status === 'pending_payment' && completedOrder._id) {
+        void signalP2pCheckoutDismiss(tgUser.id, completedOrder._id);
+      }
+    }
+    onBack();
+  }, [completedOrder, onBack, tgUser.id]);
+
+  useEffect(() => {
+    if (!completedOrder?._id) return;
+    const p2p =
+      String(completedOrder.payment_method || '')
+        .trim()
+        .toLowerCase() === 'p2p';
+    if (!p2p || completedOrder.status !== 'pending_payment') return;
+
+    const orderId = completedOrder._id;
+    const uid = tgUser.id;
+    const onPageHide = () => {
+      void signalP2pCheckoutDismiss(uid, orderId, { preferBeacon: true });
+    };
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [completedOrder, tgUser.id]);
 
   useEffect(() => {
     const p = loadUserPrefs();
@@ -163,7 +193,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
     return (
       <div className="relative min-h-screen bg-surface pb-24">
-        <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
+        <AppHeader start={<HeaderIconButton onClick={handleHeaderBack} aria-label="Orqaga">←</HeaderIconButton>} />
         <div className="flex flex-col gap-5 px-4 pt-8">
           <div className="flex flex-col items-center text-center">
             <div
@@ -177,9 +207,13 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
           {isP2p ? (
             <>
-              <div className="rounded-2xl border border-stone-200/90 bg-card px-4 py-4 shadow-sm ring-1 ring-black/[0.04]">
-                <p className="text-center text-base font-extrabold leading-snug tracking-tight text-ink sm:text-lg">
-                  To&apos;lovni amalga oshiring va buyurtmalarim bo&apos;limidan chekni yuboring.
+              <div className="rounded-2xl border border-red-200/90 bg-red-50/90 px-4 py-4 shadow-sm ring-1 ring-red-100">
+                <p className="text-center text-base leading-snug tracking-tight sm:text-lg">
+                  <span className="font-extrabold text-red-800">To&apos;lovni amalga oshiring</span>
+                  <span className="font-bold text-ink">
+                    {' '}
+                    va buyurtmalarim bo&apos;limidan chekni yuboring.
+                  </span>
                 </p>
               </div>
 
@@ -217,7 +251,18 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSuccess?.({ skipAlert: true })}
+                  onClick={() => {
+                    if (
+                      completedOrder?._id &&
+                      completedOrder.status === 'pending_payment' &&
+                      String(completedOrder.payment_method || '')
+                        .trim()
+                        .toLowerCase() === 'p2p'
+                    ) {
+                      void signalP2pCheckoutDismiss(tgUser.id, completedOrder._id);
+                    }
+                    onSuccess?.({ skipAlert: true });
+                  }}
                   className="w-full rounded-2xl border border-stone-200 bg-white py-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-[0.98]"
                 >
                   Menyuga qaytish
@@ -236,7 +281,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
   return (
     <div className="relative min-h-screen bg-surface pb-24">
-      <AppHeader start={<HeaderIconButton onClick={onBack} aria-label="Orqaga">←</HeaderIconButton>} />
+      <AppHeader start={<HeaderIconButton onClick={handleHeaderBack} aria-label="Orqaga">←</HeaderIconButton>} />
 
       <div className="px-4 pt-3">
         <h2 className="text-xl font-bold text-ink">Buyurtma</h2>
