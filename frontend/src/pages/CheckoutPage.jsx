@@ -177,6 +177,12 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
           {isP2p ? (
             <>
+              <div className="rounded-2xl border border-stone-200/90 bg-card px-4 py-4 shadow-sm ring-1 ring-black/[0.04]">
+                <p className="text-center text-base font-extrabold leading-snug tracking-tight text-ink sm:text-lg">
+                  To&apos;lovni amalga oshiring va buyurtmalarim bo&apos;limidan chekni yuboring.
+                </p>
+              </div>
+
               <div className="rounded-2xl border border-stone-200/90 bg-card p-4 shadow-sm ring-1 ring-black/[0.04]">
                 <p className="text-xs font-bold uppercase tracking-wide text-muted">Karta ma&apos;lumoti</p>
                 {cardNumber ? (
@@ -200,10 +206,6 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
                 ) : null}
                 {copyHint ? <p className="mt-2 text-xs font-semibold text-primarydark">{copyHint}</p> : null}
               </div>
-
-              <p className="text-center text-sm font-medium leading-relaxed text-muted">
-                To&apos;lovni amalga oshiring va buyurtmalarim bo&apos;limidan chekni yuboring.
-              </p>
             </>
           ) : null}
 
