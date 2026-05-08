@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useId } from 'react';
 import { createOrder, fetchP2pCardPublic } from '../api';
 import AppHeader, { HeaderIconButton } from '../components/AppHeader';
 import YandexAddressMap from '../components/YandexAddressMap';
-import { loadUserPrefs, saveUserPrefs } from '../lib/userPrefs';
+import { loadUserPrefs, PICKUP_FROM_CAFE_LABEL, saveUserPrefs } from '../lib/userPrefs';
 
 function cartTotal(cart) {
   return cart.reduce((s, line) => s + line.price * line.qty, 0);
@@ -15,6 +15,9 @@ const labelBase =
   'pointer-events-none absolute left-4 top-4 z-10 text-base text-muted transition-all duration-200 peer-focus:top-2 peer-focus:text-xs peer-focus:text-primary peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs';
 
 const PHONE_REQUIRED_MSG = 'Telefon raqamini kiriting.';
+
+const modeBtn =
+  'flex-1 rounded-xl py-3 text-center text-sm font-extrabold transition active:scale-[0.98] disabled:opacity-50';
 
 function FloatingField({ id, label, children }) {
   return (
@@ -31,6 +34,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
   const mapDomId = useId().replace(/:/g, '');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [deliveryMode, setDeliveryMode] = useState('delivery');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   /** Buyurtma yaratilgandan keyin JSON (null = forma rejimi) */
@@ -81,6 +85,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
     const p = loadUserPrefs();
     if (p.phone) setPhone((prev) => prev || p.phone);
     if (p.address) setAddress((prev) => prev || p.address);
+    setDeliveryMode(p.deliveryMode === 'pickup' ? 'pickup' : 'delivery');
   }, []);
 
   const setAddressStable = useCallback((line) => {
@@ -108,10 +113,12 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
       setError(PHONE_REQUIRED_MSG);
       return;
     }
-    if (!address.trim()) {
+    if (deliveryMode === 'delivery' && !address.trim()) {
       setError('Manzilni kiriting.');
       return;
     }
+
+    const addressLine = deliveryMode === 'pickup' ? PICKUP_FROM_CAFE_LABEL : address.trim();
 
     const payload = {
       telegram_user_id: tgUser.id,
@@ -123,7 +130,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
         qty: line.qty,
       })),
       total_price: total,
-      address: address.trim(),
+      address: addressLine,
       phone: phone.trim(),
       payment_method: 'p2p',
     };
@@ -131,7 +138,11 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
     setSubmitting(true);
     try {
       const order = await createOrder(payload);
-      saveUserPrefs({ phone: phone.trim(), address: address.trim() });
+      saveUserPrefs({
+        phone: phone.trim(),
+        deliveryMode,
+        ...(deliveryMode === 'delivery' ? { address: address.trim() } : {}),
+      });
       setCompletedOrder(order);
     } catch (err) {
       const msg = err.response?.data?.error || err.message || "Xatolik yuz berdi.";
@@ -227,7 +238,7 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
       <div className="px-4 pt-3">
         <h2 className="text-xl font-bold text-ink">Buyurtma</h2>
-        <p className="text-sm text-muted">Manzil va to&apos;lov (P2P)</p>
+        <p className="text-sm text-muted">Manzil / olib ketish va to&apos;lov (P2P)</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-4 pt-4">
@@ -256,25 +267,67 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
           />
         </FloatingField>
 
-        <YandexAddressMap
-          mapContainerId={mapDomId}
-          address={address}
-          onAddressChange={setAddressStable}
-        />
-
-        <div className="relative">
-          <textarea
-            id="checkout-address"
-            rows={3}
-            placeholder=" "
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className={`${fieldBase} min-h-[100px] resize-none peer pt-6`}
-          />
-          <label htmlFor="checkout-address" className={textareaLabel}>
-            Yetkazib berish manzili
-          </label>
+        <div className="flex gap-1 rounded-2xl bg-stone-100/95 p-1 ring-1 ring-black/[0.04]">
+          <button
+            type="button"
+            className={`${modeBtn} ${
+              deliveryMode === 'delivery'
+                ? 'bg-white text-ink shadow-sm ring-1 ring-black/[0.06]'
+                : 'text-muted hover:text-ink'
+            }`}
+            onClick={() => {
+              setDeliveryMode('delivery');
+              setError(null);
+            }}
+          >
+            Yetkazib berish
+          </button>
+          <button
+            type="button"
+            className={`${modeBtn} ${
+              deliveryMode === 'pickup'
+                ? 'bg-white text-ink shadow-sm ring-1 ring-black/[0.06]'
+                : 'text-muted hover:text-ink'
+            }`}
+            onClick={() => {
+              setDeliveryMode('pickup');
+              if (error === 'Manzilni kiriting.') setError(null);
+            }}
+          >
+            Kafedan olib ketish
+          </button>
         </div>
+
+        {deliveryMode === 'delivery' ? (
+          <>
+            <YandexAddressMap
+              mapContainerId={mapDomId}
+              address={address}
+              onAddressChange={setAddressStable}
+            />
+
+            <div className="relative">
+              <textarea
+                id="checkout-address"
+                rows={3}
+                placeholder=" "
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className={`${fieldBase} min-h-[100px] resize-none peer pt-6`}
+              />
+              <label htmlFor="checkout-address" className={textareaLabel}>
+                Yetkazib berish manzili
+              </label>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 ring-1 ring-primary/10">
+            <p className="text-sm font-extrabold text-ink">🏪 {PICKUP_FROM_CAFE_LABEL}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Manzil sifatida «{PICKUP_FROM_CAFE_LABEL}» yuboriladi — yetkazib berish talab qilinmaydi.
+            </p>
+          </div>
+        )}
 
         <div>
           <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted">To&apos;lov</span>
