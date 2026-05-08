@@ -40,13 +40,11 @@ export default function CartPage({ cart, onBrowseMenu, onOpenAddress, onCheckout
           </div>
         </div>
       ) : (
-        <>
-          <div className="px-4 pt-3">
-            <h2 className="text-xl font-bold text-ink">Savat</h2>
-            <p className="text-sm text-muted">{cart.length} turdagi mahsulot</p>
-          </div>
+        <div className="flex flex-col px-4 pb-4 pt-3">
+          <h2 className="text-xl font-bold text-ink">Savat</h2>
+          <p className="text-sm text-muted">{cart.length} turdagi mahsulot</p>
 
-          <ul className="flex-1 space-y-3 px-4 py-4">
+          <ul className="mt-4 space-y-3">
             {cart.map((line) => {
               const usePlaceholder = shouldUseImagePlaceholder(line.image_url);
               return (
@@ -112,7 +110,7 @@ export default function CartPage({ cart, onBrowseMenu, onOpenAddress, onCheckout
             })}
           </ul>
 
-          <div className="sticky bottom-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))] z-20 border-t border-stone-200/80 bg-card/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur-md">
+          <div className="mt-6 rounded-2xl border border-stone-200/80 bg-card p-4 shadow-[0_4px_20px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04]">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-muted">Jami</span>
               <span className="text-2xl font-extrabold tracking-tight text-ink">
@@ -124,7 +122,7 @@ export default function CartPage({ cart, onBrowseMenu, onOpenAddress, onCheckout
               Buyurtma berish
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
