@@ -247,7 +247,28 @@ export default function CheckoutPage({ cart, tgUser: tgUserProp, onBack, onSucce
 
               <div className="rounded-2xl bg-card p-5 shadow-card ring-1 ring-black/[0.06]">
                 <p className="text-sm font-bold text-ink">Chek yoki to&apos;lov skrinshotini yuklang</p>
-                <p className="mt-1 text-xs text-muted">Rasm admin Telegramga yuboriladi.</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  Chekingiz adminning Telegramiga bir zumda yetib boradi — to&apos;lovni tezroq tasdiqlashimiz uchun
+                  juda muhim.
+                </p>
+                {!receiptUploaded ? (
+                  <div
+                    role="status"
+                    className="mt-3 rounded-xl border border-amber-200/90 bg-amber-50/90 px-3.5 py-2.5 text-xs font-semibold leading-snug text-amber-950"
+                  >
+                    {receiptUploading ? (
+                      <>
+                        ⏳ Yuklanmoqda… Ilovani yoki brauzer oynasini <span className="underline">yopmang</span> —
+                        jarayon to&apos;xtab qolishi mumkin.
+                      </>
+                    ) : (
+                      <>
+                        ⚠️ Rasmni yuborganingizgacha ilovani yoki oynani <span className="underline">yopmang</span>.
+                        Aks holda yuklash uzilishi yoki buyurtma cheki yetib bormasligi mumkin.
+                      </>
+                    )}
+                  </div>
+                ) : null}
 
                 <input
                   ref={receiptInputRef}
