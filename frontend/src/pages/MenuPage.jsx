@@ -484,12 +484,36 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
   return (
     <div className="relative box-border flex h-[100dvh] flex-col overflow-hidden bg-surface pb-[calc(56px+max(0.5rem,env(safe-area-inset-bottom)))]">
       <div
-        className={`relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
+        className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${isSearchMode ? 'pointer-events-none opacity-[0.35]' : ''}`}
         aria-hidden={isSearchMode}
       >
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-hide">
+          <AppHeader
+            end={
+              <button
+                type="button"
+                onClick={onOpenCart}
+                className="relative flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-95"
+              >
+                <span className="text-base" aria-hidden>
+                  🛒
+                </span>
+                <span>Savat</span>
+                {cartCount > 0 && (
+                  <span
+                    className={`absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-white ${
+                      badgeBump ? 'animate-cart-bounce' : ''
+                    }`}
+                  >
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                )}
+              </button>
+            }
+          />
+
           <section
-            className="sticky top-0 z-0 isolate h-[200px] w-full shrink-0 overflow-hidden rounded-b-2xl bg-gradient-to-br from-neutral-900 via-ink to-primarydark shadow-[0_4px_20px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.08]"
+            className="relative isolate h-[200px] w-full shrink-0 overflow-hidden rounded-b-2xl bg-gradient-to-br from-neutral-900 via-ink to-primarydark shadow-[0_4px_20px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.08]"
             aria-label="Menyu banner"
           >
             <div
@@ -507,31 +531,7 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
             </div>
           </section>
 
-          <div className="relative z-10 -mt-5 flex w-full flex-col rounded-t-3xl bg-white pb-4 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.05]">
-            <AppHeader
-              end={
-                <button
-                  type="button"
-                  onClick={onOpenCart}
-                  className="relative flex h-10 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 text-sm font-bold text-ink shadow-sm transition active:scale-95"
-                >
-                  <span className="text-base" aria-hidden>
-                    🛒
-                  </span>
-                  <span>Savat</span>
-                  {cartCount > 0 && (
-                    <span
-                      className={`absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-white ${
-                        badgeBump ? 'animate-cart-bounce' : ''
-                      }`}
-                    >
-                      {cartCount > 99 ? '99+' : cartCount}
-                    </span>
-                  )}
-                </button>
-              }
-            />
-
+          <div className="flex w-full flex-col bg-white pb-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
             {!isSearchMode ? (
               <div className="px-4 pb-2 pt-3">
                 <label className="relative block">
@@ -621,12 +621,12 @@ export default function MenuPage({ cart, cartCount, onOpenCart, onAddToCart, onC
           <button
             type="button"
             aria-label="Qidiruvni yopish"
-            className="fixed inset-x-0 top-0 z-40 mx-auto max-w-[480px] border-0 bg-ink/35 backdrop-blur-[2px]"
+            className="fixed inset-x-0 top-0 z-[44] mx-auto max-w-[480px] border-0 bg-ink/35 backdrop-blur-[2px]"
             style={{ bottom: NAV_SAFE_BOTTOM }}
             onClick={clearSearch}
           />
           <div
-            className="fixed inset-x-0 z-50 mx-auto flex max-w-[480px] flex-col overflow-hidden rounded-t-3xl bg-card shadow-[0_-12px_48px_rgba(0,0,0,0.18)] ring-1 ring-stone-200/90"
+            className="fixed inset-x-0 z-[45] mx-auto flex max-w-[480px] flex-col overflow-hidden rounded-t-3xl bg-card shadow-[0_-12px_48px_rgba(0,0,0,0.18)] ring-1 ring-stone-200/90"
             style={{
               bottom: NAV_SAFE_BOTTOM,
               top: 'max(4.5rem, env(safe-area-inset-top))',

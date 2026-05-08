@@ -1,6 +1,6 @@
 export default function AppHeader({ start, end }) {
   return (
-    <header className="sticky top-0 z-30 flex h-[52px] shrink-0 items-center gap-3 bg-card px-4 text-ink shadow-header">
+    <header className="sticky top-0 z-50 flex h-[52px] shrink-0 items-center gap-3 bg-card px-4 text-ink shadow-header">
       {start}
       <div className="flex min-w-0 items-center gap-2.5">
         <img src="/logo.png" alt="" className="h-9 w-auto max-w-[100px] object-contain" height={36} />
