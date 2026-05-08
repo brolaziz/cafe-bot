@@ -44,7 +44,7 @@ function ConfirmSheet({ open, title, description, confirmLabel, onConfirm, onCan
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.25rem,calc(56px+env(safe-area-inset-bottom)+0.75rem))] sm:px-5 sm:py-8"
+      className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
@@ -58,7 +58,7 @@ function ConfirmSheet({ open, title, description, confirmLabel, onConfirm, onCan
         }}
       />
       <div
-        className={`relative z-10 w-full max-w-[360px] rounded-[1.35rem] bg-card p-5 shadow-[0_24px_64px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06] animate-modal-sheet motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none`}
+        className={`relative z-10 mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-[0_24px_64px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.06] animate-modal-sheet motion-reduce:animate-none motion-reduce:opacity-100 motion-reduce:transform-none`}
       >
         <p id="confirm-title" className="text-lg font-bold tracking-tight text-ink">
           {title}
