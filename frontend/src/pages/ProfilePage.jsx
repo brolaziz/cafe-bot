@@ -15,8 +15,6 @@ const STATUS_UZ = {
   cancelled: 'Bekor qilindi',
 };
 
-const ACTIVE_STATUSES = new Set(['pending', 'pending_payment', 'paid', 'confirmed', 'preparing', 'ready']);
-
 function formatOrderWhen(iso) {
   if (!iso) return '—';
   try {
@@ -211,7 +209,6 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState(null);
-  const [ordersTab, setOrdersTab] = useState('active');
   const [deletingId, setDeletingId] = useState(null);
   const [clearingAll, setClearingAll] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -225,14 +222,13 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
     return a || '';
   }, [tgUser]);
 
-  const activeOrders = useMemo(
-    () => orders.filter((o) => ACTIVE_STATUSES.has(o.status)),
-    [orders]
-  );
-  const pastOrders = useMemo(
-    () => orders.filter((o) => !ACTIVE_STATUSES.has(o.status)),
-    [orders]
-  );
+  const sortedOrders = useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const ta = new Date(a.created_at || 0).getTime();
+      const tb = new Date(b.created_at || 0).getTime();
+      return tb - ta;
+    });
+  }, [orders]);
 
   useEffect(() => {
     const p = loadUserPrefs();
@@ -268,7 +264,6 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
     if (!ordersFocusSignal) return;
     const id = window.requestAnimationFrame(() => {
       ordersSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setOrdersTab('active');
     });
     return () => window.cancelAnimationFrame(id);
   }, [ordersFocusSignal]);
@@ -282,7 +277,6 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
 
   const visibleName = displayName.trim() || telegramFullName || 'Mehmon';
   const visiblePhone = phone.trim();
-  const shownOrders = ordersTab === 'active' ? activeOrders : pastOrders;
 
   async function handleConfirmDelete() {
     const snapshot = confirm;
@@ -452,7 +446,7 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
                 </span>
                 <div className="min-w-0">
                   <h3 className="text-base font-bold text-ink">Buyurtmalar</h3>
-                  <p className="text-xs text-muted">Faol va yakunlangan buyurtmalar</p>
+                  <p className="text-xs text-muted">Yangi avval</p>
                 </div>
               </div>
               {telegramId ? (
@@ -507,86 +501,39 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
                   onPrimary={() => void loadOrders()}
                 />
               ) : (
-                <>
-                  <div className="flex rounded-2xl bg-stone-200/50 p-1">
-                    <button
-                      type="button"
-                      onClick={() => setOrdersTab('active')}
-                      className={`relative flex-1 rounded-[0.85rem] py-2.5 text-xs font-extrabold transition duration-200 ${
-                        ordersTab === 'active'
-                          ? 'bg-white text-primarydark shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
-                          : 'text-muted'
-                      } ${pressable}`}
-                    >
-                      Faol
-                      {activeOrders.length > 0 ? (
-                        <span className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary/18 px-1 text-[10px] font-bold text-primarydark">
-                          {activeOrders.length}
-                        </span>
-                      ) : null}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOrdersTab('past')}
-                      className={`relative flex-1 rounded-[0.85rem] py-2.5 text-xs font-extrabold transition duration-200 ${
-                        ordersTab === 'past'
-                          ? 'bg-white text-primarydark shadow-[0_2px_12px_rgba(0,0,0,0.06)]'
-                          : 'text-muted'
-                      } ${pressable}`}
-                    >
-                      Tarix
-                      {pastOrders.length > 0 ? (
-                        <span className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-stone-300/60 px-1 text-[10px] font-bold text-ink">
-                          {pastOrders.length}
-                        </span>
-                      ) : null}
-                    </button>
-                  </div>
-
-                  <div key={ordersTab} className="mt-4 animate-tab-content motion-reduce:animate-none">
-                    {shownOrders.length === 0 ? (
-                      ordersTab === 'active' ? (
-                        <EmptyState
-                          emoji="🎉"
-                          title="Faol buyurtma yo'q"
-                          lines={["Hozircha jarayondagi buyurtmalar yo'q — yangisini berib ko'ring!"]}
-                          primaryLabel="Mahsulotlarga o'tish"
-                          onPrimary={onBrowseMenu}
+                <div className="mt-1 animate-tab-content motion-reduce:animate-none">
+                  {sortedOrders.length === 0 ? (
+                    <EmptyState
+                      emoji="🎉"
+                      title="Buyurtmalar yo'q"
+                      lines={["Hozircha buyurtma yo'q — mahsulotlardan tanlang!"]}
+                      primaryLabel="Mahsulotlarga o'tish"
+                      onPrimary={onBrowseMenu}
+                    />
+                  ) : (
+                    <ul className="flex flex-col gap-3">
+                      {sortedOrders.map((o, i) => (
+                        <OrderCard
+                          key={String(o._id)}
+                          order={o}
+                          index={i}
+                          telegramId={telegramId}
+                          deletingId={deletingId}
+                          onReceiptUploaded={() => void loadOrders()}
+                          onRequestDelete={(ord) => {
+                            setActionError(null);
+                            setConfirm({
+                              mode: 'one',
+                              orderId: String(ord._id),
+                              title: "Buyurtmani o'chirish?",
+                              description: `№${String(ord._id).slice(-6)} — ${formatOrderWhen(ord.created_at)}. Bu yozuv tarixdan olib tashlanadi.`,
+                            });
+                          }}
                         />
-                      ) : (
-                        <EmptyState
-                          emoji="📜"
-                          title="Tarix bo'sh"
-                          lines={["Tugagan buyurtmalar shu yerda to'planadi."]}
-                          primaryLabel="Mahsulotlarga o'tish"
-                          onPrimary={onBrowseMenu}
-                        />
-                      )
-                    ) : (
-                      <ul className="flex flex-col gap-3">
-                        {shownOrders.map((o, i) => (
-                          <OrderCard
-                            key={String(o._id)}
-                            order={o}
-                            index={i}
-                            telegramId={telegramId}
-                            deletingId={deletingId}
-                            onReceiptUploaded={() => void loadOrders()}
-                            onRequestDelete={(ord) => {
-                              setActionError(null);
-                              setConfirm({
-                                mode: 'one',
-                                orderId: String(ord._id),
-                                title: "Buyurtmani o'chirish?",
-                                description: `№${String(ord._id).slice(-6)} — ${formatOrderWhen(ord.created_at)}. Bu yozuv tarixdan olib tashlanadi.`,
-                              });
-                            }}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
           </section>
