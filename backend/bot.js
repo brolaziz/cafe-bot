@@ -300,7 +300,7 @@ async function handleReceiptFlowCallback(query) {
 
       await botInstance.sendMessage(
         order.telegram_user_id,
-        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz qabul qilindi va tayyorlanmoqda. Tayyor bo'lganimizda shu yerda (Telegram) xabar beramiz 🍽"
+        "✅ To'lov tasdiqlandi. Buyurtma tayyorlanmoqda — tayyor bo'lsag qisqa xabar beramiz."
       );
 
       const adminNotify = appendYandexMapsLinkToAdminOrderMessage(
@@ -416,10 +416,7 @@ async function handleOrderReadyCallback(query) {
 
     let customerNotified = true;
     try {
-      await botInstance.sendMessage(
-        order.telegram_user_id,
-        "✅ Buyurtmangiz tayyor! Kafeda olib ketishingiz yoki yetkazib berish mumkin. Rahmat! ☕"
-      );
+      await botInstance.sendMessage(order.telegram_user_id, "✅ Buyurtmangiz tayyor! Rahmat ☕");
     } catch (sendErr) {
       customerNotified = false;
       console.warn('order_ready customer notify:', sendErr?.message || sendErr);
@@ -427,7 +424,7 @@ async function handleOrderReadyCallback(query) {
 
     const suffix = customerNotified
       ? '\n\n✅ Mijozga «buyurtma tayyor» xabari yuborildi.'
-      : "\n\n⚠️ Holat «tayyor» saqlandi, lekin mijozga Telegram xabari yuborilmadi (bot bloklangan bo'lishi mumkin).";
+      : "\n\n⚠️ Holat «tayyor» saqlandi, lekin mijozga xabar yuborilmadi.";
     const newText = (prevText || '') + suffix;
 
     await botInstance.editMessageText(newText, {
@@ -529,7 +526,7 @@ async function handleP2pReceiptCallback(query) {
 
       await botInstance.sendMessage(
         order.telegram_user_id,
-        "✅ To'lovingiz tasdiqlandi! Buyurtmangiz qabul qilindi va tayyorlanmoqda. Tayyor bo'lganimizda shu yerda (Telegram) xabar beramiz 🍽"
+        "✅ To'lov tasdiqlandi. Buyurtma tayyorlanmoqda — tayyor bo'lsag qisqa xabar beramiz."
       );
 
       const adminNotify = appendYandexMapsLinkToAdminOrderMessage(
@@ -839,9 +836,11 @@ async function handleAdminCallback(query) {
 
   if (data === 'cleanup_confirm') {
     try {
-      const deletedCount = await deleteOldOrders();
+      const { deletedCount, retentionDays } = await deleteOldOrders();
       await answer();
-      const resultText = `✅ Tozalash tugadi! ${deletedCount} ta eski buyurtma o'chirildi.`;
+      const resultText =
+        `✅ MongoDB tozalandi.\n` +
+        `Oxirgi ${retentionDays} kun saqlanadi; jami ${deletedCount} ta eski buyurtma olib tashlandi.`;
       if (messageId != null) {
         try {
           await botInstance.editMessageText(resultText, {
@@ -1107,7 +1106,7 @@ async function handleAdminMessage(msg) {
   if (text === '/cleanup' || text === '🗑 Tozalash') {
     await botInstance.sendMessage(
       chatId,
-      `🗑 Haqiqatan ham ${ORDER_RETENTION_DAYS} kundan eski buyurtmalarni o'chirmoqchimisiz?`,
+      `🗑 MongoDB dagi ${ORDER_RETENTION_DAYS} kundan oldingi barcha eski buyurtmalar o'chiriladi (so'nggi ${ORDER_RETENTION_DAYS} kun saqlanadi). Tasdiqlaysizmi?`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -1456,7 +1455,7 @@ function initBot() {
         try {
           await botInstance.sendMessage(
             order.telegram_user_id,
-            "✅ Buyurtmangiz qabul qilindi! Tayyor bo'lganimizda shu yerda (Telegram) xabar beramiz 🍽"
+            "✅ Buyurtma qabul qilindi. Tayyor bo'lsag qisqa xabar beramiz."
           );
         } catch (_) {
           /* mijoz botni bloklagan bo'lishi mumkin */

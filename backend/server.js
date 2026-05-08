@@ -55,10 +55,13 @@ async function start() {
     await connectDb();
     initBot();
 
+    /** Har kecha: 7 kundan oshgan buyurtmalar avtomatik o'chiriladi */
     cron.schedule('0 0 * * *', async () => {
       try {
-        const deletedCount = await deleteOldOrders();
-        console.log(`Auto-cleanup: ${deletedCount} old orders deleted`);
+        const { deletedCount, retentionDays } = await deleteOldOrders();
+        console.log(
+          `Auto-cleanup (MongoDB): oxirgi ${retentionDays} kun saqlanadi; ${deletedCount} ta eski buyurtma o'chirildi`
+        );
       } catch (err) {
         console.error('Auto-cleanup failed:', err);
       }

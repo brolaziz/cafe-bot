@@ -271,29 +271,46 @@ export default function ProfilePage({ tgUser, onBrowseMenu, ordersFocusSignal = 
     setPhone(p.phone || '');
   }, [telegramFullName]);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (options = {}) => {
+    const silent = Boolean(options.silent);
     if (!telegramId) {
       setOrders([]);
-      setLoadingOrders(false);
-      setOrdersError(null);
+      if (!silent) {
+        setLoadingOrders(false);
+        setOrdersError(null);
+      }
       return;
     }
-    setLoadingOrders(true);
-    setOrdersError(null);
+    if (!silent) {
+      setLoadingOrders(true);
+      setOrdersError(null);
+    }
     try {
       const data = await fetchMyOrders(telegramId);
       setOrders(Array.isArray(data) ? data : []);
+      setOrdersError(null);
     } catch {
-      setOrders([]);
-      setOrdersError("Buyurtmalar ro'yxatini yuklab bo'lmadi.");
+      if (!silent) {
+        setOrders([]);
+        setOrdersError("Buyurtmalar ro'yxatini yuklab bo'lmadi.");
+      }
     } finally {
-      setLoadingOrders(false);
+      if (!silent) setLoadingOrders(false);
     }
   }, [telegramId]);
 
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  /** Buyurtmalar statusi (admin o'zgarishlari) — 3 s da ovozsiz yangilash */
+  useEffect(() => {
+    if (!telegramId) return undefined;
+    const tick = window.setInterval(() => {
+      void loadOrders({ silent: true });
+    }, 3000);
+    return () => window.clearInterval(tick);
+  }, [telegramId, loadOrders]);
 
   useEffect(() => {
     if (!ordersFocusSignal) return;
