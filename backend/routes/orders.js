@@ -241,12 +241,28 @@ router.post(
 
       const username = order.telegram_username && String(order.telegram_username).trim();
       const atPart = username ? `@${username}` : "foydalanuvchi";
-      const caption = [
+      
+      // Build full order details caption for admin
+      const orderLines = [
         "💳 P2P TO'LOV CHEKI",
-        `👤 Mijoz: ${atPart} (telegram_user_id: ${order.telegram_user_id})`,
         `📋 Buyurtma: #${order._id}`,
-        `💰 Summa: ${order.total_price} so'm`,
-      ].join('\n');
+        `👤 Mijoz: ${atPart}`,
+        `📞 Tel: ${order.phone}`,
+        `📍 Manzil: ${order.address}`,
+        '',
+        '🛒 Buyurtma:',
+      ];
+      for (const item of order.items) {
+        const lineTotal = item.price * item.qty;
+        orderLines.push(`- ${item.name} x${item.qty} = ${lineTotal} so'm`);
+      }
+      orderLines.push('');
+      orderLines.push(`💰 Jami: ${order.total_price} so'm`);
+      orderLines.push(`💳 To'lov: ${order.payment_method}`);
+      orderLines.push('');
+      orderLines.push('✅ Chek yuklandi — tasdiqlang yoki rad eting.');
+      
+      const caption = orderLines.join('\n');
 
       const ext = (req.file.originalname && /\.[a-z0-9]+$/i.exec(req.file.originalname)?.[0]) || '.jpg';
       const filename = `receipt${ext}`.slice(0, 64);
@@ -424,10 +440,8 @@ router.post('/', async (req, res, next) => {
         const isP2pOrder = String(order.payment_method || '')
           .trim()
           .toLowerCase() === 'p2p';
-        if (isP2pOrder) {
-          const p2pIntro = formatP2pNewPendingPaymentAdminMessage(order);
-          await bot.sendMessage(adminChatId, p2pIntro);
-        } else {
+        // P2P orders: do NOT notify admin yet - wait for receipt upload
+        if (!isP2pOrder) {
           const text = appendYandexMapsLinkToAdminOrderMessage(
             formatAdminOrderMessage(order),
             order.address

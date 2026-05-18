@@ -211,12 +211,28 @@ async function handleCustomerP2pPhoto(msg) {
   const username = order.telegram_username && String(order.telegram_username).trim();
   const userLine = username ? `@${username}` : `(id: ${order.telegram_user_id})`;
   const orderShort = String(order._id).slice(-6);
-  const caption = [
+  
+  // Build full order details caption
+  const orderLines = [
     "💳 P2P TO'LOV CHEKI",
-    `👤 Mijoz: ${userLine}`,
     `📋 Buyurtma: #${orderShort}`,
-    `💰 Summa: ${order.total_price} so'm`,
-  ].join('\n');
+    `👤 Mijoz: ${userLine}`,
+    `📞 Tel: ${order.phone}`,
+    `📍 Manzil: ${order.address}`,
+    '',
+    '🛒 Buyurtma:',
+  ];
+  for (const item of order.items) {
+    const lineTotal = item.price * item.qty;
+    orderLines.push(`- ${item.name} x${item.qty} = ${lineTotal} so'm`);
+  }
+  orderLines.push('');
+  orderLines.push(`💰 Jami: ${order.total_price} so'm`);
+  orderLines.push(`💳 To'lov: ${order.payment_method}`);
+  orderLines.push('');
+  orderLines.push('✅ Chek yuklandi — tasdiqlang yoki rad eting.');
+  
+  const caption = orderLines.join('\n');
 
   const prevStatus = order.status;
   order.status = 'receipt_sent';
@@ -630,6 +646,28 @@ const CB_ADMIN_NEW_CATEGORY = 'adm_new_category';
 function cbAddProductInCategory(cid) {
   return `adm_ap_${cid}`;
 }
+/** Kategoriya tahrirlash */
+function cbEditCategory(cid) {
+  return `adm_ec_${cid}`;
+}
+function cbEditCategoryNameUz(cid) {
+  return `adm_ecnu_${cid}`;
+}
+function cbEditCategoryNameRu(cid) {
+  return `adm_ecnr_${cid}`;
+}
+function cbEditCategoryIcon(cid) {
+  return `adm_eci_${cid}`;
+}
+function cbDeleteCategory(cid) {
+  return `adm_dlc_${cid}`;
+}
+function cbDeleteCategoryConfirm(cid) {
+  return `adm_dlcc_${cid}`;
+}
+function cbDeleteCategoryCancel(cid) {
+  return `adm_dlxc_${cid}`;
+}
 /** Mahsulot boshqaruv menyusi */
 function cbSelectProduct(pid) {
   return `adm_s_${pid}`;
@@ -695,7 +733,10 @@ async function sendCatalogRoot(chatId, userId) {
     );
     return;
   }
-  const rows = cats.map((c) => [{ text: c.name_uz, callback_data: cbGotoCategory(String(c._id)) }]);
+  const rows = cats.map((c) => [
+    { text: c.name_uz, callback_data: cbGotoCategory(String(c._id)) },
+    { text: '✏️', callback_data: cbEditCategory(String(c._id)) },
+  ]);
   rows.push([{ text: '⬅️ Asosiy menyu', callback_data: CB_ADMIN_MAIN_MENU }]);
   rows.push([{ text: "➕ Kategoriya qo'shish", callback_data: CB_ADMIN_NEW_CATEGORY }]);
   await hideReplyKeyboardEphemeral(chatId);
@@ -744,6 +785,133 @@ async function sendCatalogCategoryView(chatId, userId, categoryId) {
   keyboard.push(...footerRows);
 
   await botInstance.sendMessage(chatId, text, { reply_markup: { inline_keyboard: keyboard } });
+}
+
+/** Kategoriya tahrirlash menyusi */
+async function sendCategoryEditMenu(chatId, userId, categoryId) {
+  if (!mongoose.isValidObjectId(categoryId)) {
+    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+
+  setState(userId, { type: 'edit_category', categoryId: String(categoryId) });
+
+  const iconLine = cat.image_url ? `\n🎨 Icon: ${cat.image_url}` : "\n🎨 Icon: yo'q";
+  const caption = `📁 ${cat.name_uz}\n🇷🇺 ${cat.name_ru || '—'}${iconLine}`;
+
+  const reply_markup = {
+    inline_keyboard: [
+      [{ text: "✏️ Nom (O'zb)", callback_data: cbEditCategoryNameUz(categoryId) }],
+      [{ text: '✏️ Nom (Rus)', callback_data: cbEditCategoryNameRu(categoryId) }],
+      [{ text: '🎨 Icon (emoji)', callback_data: cbEditCategoryIcon(categoryId) }],
+      [{ text: "🚫 O'chirish", callback_data: cbDeleteCategory(categoryId) }],
+      [{ text: '⬅️ Kategoriyalar', callback_data: CB_ADMIN_BACK_ROOT }],
+    ],
+  };
+
+  await botInstance.sendMessage(chatId, caption, { reply_markup });
+}
+
+async function startEditCategoryNameUz(chatId, userId, categoryId) {
+  if (!mongoose.isValidObjectId(categoryId)) {
+    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  setState(userId, {
+    type: 'edit_category_name_uz',
+    categoryId: String(categoryId),
+  });
+  await botInstance.sendMessage(
+    chatId,
+    `Kategoriya nomini kiriting (o'zbekcha):\n\nHozirgi: ${cat.name_uz}`,
+    { reply_markup: REMOVE_REPLY_KEYBOARD }
+  );
+}
+
+async function startEditCategoryNameRu(chatId, userId, categoryId) {
+  if (!mongoose.isValidObjectId(categoryId)) {
+    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  setState(userId, {
+    type: 'edit_category_name_ru',
+    categoryId: String(categoryId),
+  });
+  await botInstance.sendMessage(
+    chatId,
+    `Название категории (русский):\n\nТекущее: ${cat.name_ru || '—'}`,
+    { reply_markup: REMOVE_REPLY_KEYBOARD }
+  );
+}
+
+async function startEditCategoryIcon(chatId, userId, categoryId) {
+  if (!mongoose.isValidObjectId(categoryId)) {
+    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  setState(userId, {
+    type: 'edit_category_icon',
+    categoryId: String(categoryId),
+  });
+  await botInstance.sendMessage(
+    chatId,
+    `Kategoriya iconini kiriting (emoji yoki URL):\n\nHozirgi: ${cat.image_url || "yo'q"}\n\n"skip" deb yuborsangiz icon o'chiriladi.`,
+    { reply_markup: REMOVE_REPLY_KEYBOARD }
+  );
+}
+
+async function startDeleteCategory(chatId, userId, categoryId) {
+  if (!mongoose.isValidObjectId(categoryId)) {
+    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+  const cat = await Category.findById(categoryId).lean();
+  if (!cat) {
+    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
+    return;
+  }
+
+  const productCount = await Product.countDocuments({ category_id: categoryId });
+  let warning = '';
+  if (productCount > 0) {
+    warning = `\n\n⚠️ DIQQAT: Bu kategoriyada ${productCount} ta mahsulot bor. Kategoriya o'chirilganda barcha mahsulotlar ham o'chiriladi!`;
+  }
+
+  setState(userId, { type: 'delete_category_pending', categoryId: String(categoryId) });
+  await botInstance.sendMessage(
+    chatId,
+    `📁 "${cat.name_uz}" kategoriyasini o'chirishni tasdiqlaysizmi?${warning}`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "✅ Ha, o'chirish", callback_data: cbDeleteCategoryConfirm(categoryId) },
+            { text: "❌ Yo'q", callback_data: cbDeleteCategoryCancel(categoryId) },
+          ],
+        ],
+      },
+    }
+  );
 }
 
 /** Tanlangan mahsulot: tahrirlash / narx / rasm / o'chirish */
@@ -957,6 +1125,100 @@ async function handleAdminCallback(query) {
     }
     await answer();
     await sendCatalogCategoryView(chatId, userId, cid);
+    return true;
+  }
+
+  const mEditCat = data.match(/^adm_ec_(.+)$/);
+  if (mEditCat) {
+    const cid = mEditCat[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    await sendCategoryEditMenu(chatId, userId, cid);
+    return true;
+  }
+
+  const mEditCatNameUz = data.match(/^adm_ecnu_(.+)$/);
+  if (mEditCatNameUz) {
+    const cid = mEditCatNameUz[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    await startEditCategoryNameUz(chatId, userId, cid);
+    return true;
+  }
+
+  const mEditCatNameRu = data.match(/^adm_ecnr_(.+)$/);
+  if (mEditCatNameRu) {
+    const cid = mEditCatNameRu[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    await startEditCategoryNameRu(chatId, userId, cid);
+    return true;
+  }
+
+  const mEditCatIcon = data.match(/^adm_eci_(.+)$/);
+  if (mEditCatIcon) {
+    const cid = mEditCatIcon[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    await startEditCategoryIcon(chatId, userId, cid);
+    return true;
+  }
+
+  const mDelCat = data.match(/^adm_dlc_(.+)$/);
+  if (mDelCat) {
+    const cid = mDelCat[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    await startDeleteCategory(chatId, userId, cid);
+    return true;
+  }
+
+  const mDelCatConfirm = data.match(/^adm_dlcc_(.+)$/);
+  if (mDelCatConfirm) {
+    const cid = mDelCatConfirm[1];
+    if (!mongoose.isValidObjectId(cid)) {
+      await answer("Noto'g'ri kategoriya", true);
+      return true;
+    }
+    await answer();
+    const cat = await Category.findById(cid);
+    if (cat) {
+      await Category.findByIdAndDelete(cid);
+      await Product.deleteMany({ category_id: cid });
+      await botInstance.sendMessage(chatId, `✅ Kategoriya va undagi barcha mahsulotlar o'chirildi.`);
+    } else {
+      await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.');
+    }
+    clearAdminState(userId);
+    await sendCatalogRoot(chatId, userId);
+    return true;
+  }
+
+  const mDelCatCancel = data.match(/^adm_dlxc_(.+)$/);
+  if (mDelCatCancel) {
+    const cid = mDelCatCancel[1];
+    await answer("Bekor qilindi");
+    clearAdminState(userId);
+    if (mongoose.isValidObjectId(cid)) {
+      await sendCategoryEditMenu(chatId, userId, cid);
+    } else {
+      await sendCatalogRoot(chatId, userId);
+    }
     return true;
   }
 
@@ -1365,13 +1627,66 @@ async function handleAdminMessage(msg) {
     return true;
   }
 
+  if (st.type === 'edit_category_name_uz') {
+    if (!text) {
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+        reply_markup: REMOVE_REPLY_KEYBOARD,
+      });
+      return true;
+    }
+    const cid = st.categoryId;
+    await Category.findByIdAndUpdate(cid, { name_uz: text });
+    clearAdminState(userId);
+    await botInstance.sendMessage(chatId, "✅ Kategoriya nomi (O'zbekcha) yangilandi.", { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCategoryEditMenu(chatId, userId, cid);
+    return true;
+  }
+
+  if (st.type === 'edit_category_name_ru') {
+    if (!text) {
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+        reply_markup: REMOVE_REPLY_KEYBOARD,
+      });
+      return true;
+    }
+    const cid = st.categoryId;
+    await Category.findByIdAndUpdate(cid, { name_ru: text });
+    clearAdminState(userId);
+    await botInstance.sendMessage(chatId, "✅ Категория имени (Русский) обновлено.", { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCategoryEditMenu(chatId, userId, cid);
+    return true;
+  }
+
+  if (st.type === 'edit_category_icon') {
+    const url = /^skip$/i.test(text) ? '' : text;
+    if (url && !/^https?:\/\//i.test(url) && text.toLowerCase() !== 'skip') {
+      await botInstance.sendMessage(
+        chatId,
+        "URL http/https bilan boshlanishi kerak yoki 'skip' yozing.",
+        { reply_markup: REMOVE_REPLY_KEYBOARD }
+      );
+      return true;
+    }
+    const cid = st.categoryId;
+    await Category.findByIdAndUpdate(cid, { image_url: url });
+    clearAdminState(userId);
+    await botInstance.sendMessage(chatId, "✅ Kategoriya iconi yangilandi.", { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await sendCategoryEditMenu(chatId, userId, cid);
+    return true;
+  }
+
   if (st.type !== 'idle') {
     const kbCategoryFlow =
       st.type === 'catalog_view' ||
       st.type === 'add_product' ||
       st.type === 'await_price' ||
       st.type === 'edit_product_name_uz' ||
-      st.type === 'await_product_image';
+      st.type === 'await_product_image' ||
+      st.type === 'edit_category' ||
+      st.type === 'edit_category_name_uz' ||
+      st.type === 'edit_category_name_ru' ||
+      st.type === 'edit_category_icon' ||
+      st.type === 'delete_category_pending';
     const kbP2pEdit = st.type === 'edit_p2p_card';
     await botInstance.sendMessage(chatId, "Tushunarsiz buyruq. Inline tugmalar yoki 📦 Katalog orqali davom eting.", {
       reply_markup: kbCategoryFlow
