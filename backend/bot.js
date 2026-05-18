@@ -827,11 +827,10 @@ async function startEditCategoryNameUz(chatId, userId, categoryId) {
     type: 'edit_category_name_uz',
     categoryId: String(categoryId),
   });
-  const currentIcon = cat.image_url || 'yoʻq';
+  const icon = cat.image_url || '📁';
   await botInstance.sendMessage(
     chatId,
-    `Kategoriya nomini kiriting (o'zbekcha):\n\nHozirgi: ${currentIcon} ${cat.name_uz}\n\nFormat: "🎨 Nom" (masalan: "🍕 Pizza")`,
-    { reply_markup: REMOVE_REPLY_KEYBOARD }
+    `✏️ Kategoriya nomini kiriting:\nHozirgi: ${icon} ${cat.name_uz}\n\nFormat: 🍕 Pizza`
   );
 }
 
@@ -849,11 +848,10 @@ async function startEditCategoryNameRu(chatId, userId, categoryId) {
     type: 'edit_category_name_ru',
     categoryId: String(categoryId),
   });
-  const currentIcon = cat.image_url || 'yoʻq';
+  const icon = cat.image_url || '📁';
   await botInstance.sendMessage(
     chatId,
-    `Название категории (русский):\n\nТекущее: ${currentIcon} ${cat.name_ru || '—'}\n\nФормат: "🎨 Название" (например: "🍕 Пицца")`,
-    { reply_markup: REMOVE_REPLY_KEYBOARD }
+    `✏️ Название категории:\nТекущее: ${icon} ${cat.name_ru || '—'}\n\nФормат: 🍕 Пицца`
   );
 }
 
