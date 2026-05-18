@@ -656,9 +656,6 @@ function cbEditCategoryNameUz(cid) {
 function cbEditCategoryNameRu(cid) {
   return `adm_ecnr_${cid}`;
 }
-function cbEditCategoryIcon(cid) {
-  return `adm_eci_${cid}`;
-}
 function cbDeleteCategory(cid) {
   return `adm_dlc_${cid}`;
 }
@@ -802,13 +799,12 @@ async function sendCategoryEditMenu(chatId, userId, categoryId) {
   setState(userId, { type: 'edit_category', categoryId: String(categoryId) });
 
   const iconLine = cat.image_url ? `\n🎨 Icon: ${cat.image_url}` : "\n🎨 Icon: yo'q";
-  const caption = `📁 ${cat.name_uz}\n🇷🇺 ${cat.name_ru || '—'}${iconLine}`;
+  const caption = `📁 ${cat.name_uz}\n🇷🇺 ${cat.name_ru || '—'}${iconLine}\n\n✏️ Nom tahrirlashda: "🎨 Nom" formatida yuboring (masalan: "🍕 Pizza")`;
 
   const reply_markup = {
     inline_keyboard: [
       [{ text: "✏️ Nom (O'zb)", callback_data: cbEditCategoryNameUz(categoryId) }],
       [{ text: '✏️ Nom (Rus)', callback_data: cbEditCategoryNameRu(categoryId) }],
-      [{ text: '🎨 Icon (emoji)', callback_data: cbEditCategoryIcon(categoryId) }],
       [{ text: "🚫 O'chirish", callback_data: cbDeleteCategory(categoryId) }],
       [{ text: '⬅️ Kategoriyalar', callback_data: CB_ADMIN_BACK_ROOT }],
     ],
@@ -831,9 +827,10 @@ async function startEditCategoryNameUz(chatId, userId, categoryId) {
     type: 'edit_category_name_uz',
     categoryId: String(categoryId),
   });
+  const currentIcon = cat.image_url || 'yoʻq';
   await botInstance.sendMessage(
     chatId,
-    `Kategoriya nomini kiriting (o'zbekcha):\n\nHozirgi: ${cat.name_uz}`,
+    `Kategoriya nomini kiriting (o'zbekcha):\n\nHozirgi: ${currentIcon} ${cat.name_uz}\n\nFormat: "🎨 Nom" (masalan: "🍕 Pizza")`,
     { reply_markup: REMOVE_REPLY_KEYBOARD }
   );
 }
@@ -852,30 +849,10 @@ async function startEditCategoryNameRu(chatId, userId, categoryId) {
     type: 'edit_category_name_ru',
     categoryId: String(categoryId),
   });
+  const currentIcon = cat.image_url || 'yoʻq';
   await botInstance.sendMessage(
     chatId,
-    `Название категории (русский):\n\nТекущее: ${cat.name_ru || '—'}`,
-    { reply_markup: REMOVE_REPLY_KEYBOARD }
-  );
-}
-
-async function startEditCategoryIcon(chatId, userId, categoryId) {
-  if (!mongoose.isValidObjectId(categoryId)) {
-    await botInstance.sendMessage(chatId, "Noto'g'ri kategoriya.", { reply_markup: ADMIN_KB_CATALOG_ROOT });
-    return;
-  }
-  const cat = await Category.findById(categoryId).lean();
-  if (!cat) {
-    await botInstance.sendMessage(chatId, 'Kategoriya topilmadi.', { reply_markup: ADMIN_KB_CATALOG_ROOT });
-    return;
-  }
-  setState(userId, {
-    type: 'edit_category_icon',
-    categoryId: String(categoryId),
-  });
-  await botInstance.sendMessage(
-    chatId,
-    `Kategoriya iconini kiriting (emoji yoki URL):\n\nHozirgi: ${cat.image_url || "yo'q"}\n\n"skip" deb yuborsangiz icon o'chiriladi.`,
+    `Название категории (русский):\n\nТекущее: ${currentIcon} ${cat.name_ru || '—'}\n\nФормат: "🎨 Название" (например: "🍕 Пицца")`,
     { reply_markup: REMOVE_REPLY_KEYBOARD }
   );
 }
@@ -1161,18 +1138,6 @@ async function handleAdminCallback(query) {
     }
     await answer();
     await startEditCategoryNameRu(chatId, userId, cid);
-    return true;
-  }
-
-  const mEditCatIcon = data.match(/^adm_eci_(.+)$/);
-  if (mEditCatIcon) {
-    const cid = mEditCatIcon[1];
-    if (!mongoose.isValidObjectId(cid)) {
-      await answer("Noto'g'ri kategoriya", true);
-      return true;
-    }
-    await answer();
-    await startEditCategoryIcon(chatId, userId, cid);
     return true;
   }
 
@@ -1635,7 +1600,35 @@ async function handleAdminMessage(msg) {
       return true;
     }
     const cid = st.categoryId;
-    await Category.findByIdAndUpdate(cid, { name_uz: text });
+    // Parse emoji + name format: "🍕 Pizza" → icon=🍕, name=Pizza
+    const trimmed = text.trim();
+    const firstChar = trimmed.charAt(0);
+    let icon = '';
+    let name = trimmed;
+    
+    // Check if first character is an emoji (Unicode range for common emojis)
+    const emojiRegex = /^[\p{Emoji}]/u;
+    if (emojiRegex.test(trimmed)) {
+      // Find the space after emoji
+      const spaceIndex = trimmed.indexOf(' ');
+      if (spaceIndex > 0) {
+        icon = trimmed.substring(0, spaceIndex);
+        name = trimmed.substring(spaceIndex + 1).trim();
+      } else {
+        // Only emoji, no name
+        icon = trimmed;
+        name = '';
+      }
+    }
+    
+    if (!name) {
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+        reply_markup: REMOVE_REPLY_KEYBOARD,
+      });
+      return true;
+    }
+    
+    await Category.findByIdAndUpdate(cid, { name_uz: name, image_url: icon });
     clearAdminState(userId);
     await botInstance.sendMessage(chatId, "✅ Kategoriya nomi (O'zbekcha) yangilandi.", { reply_markup: REMOVE_REPLY_KEYBOARD });
     await sendCategoryEditMenu(chatId, userId, cid);
@@ -1650,27 +1643,33 @@ async function handleAdminMessage(msg) {
       return true;
     }
     const cid = st.categoryId;
-    await Category.findByIdAndUpdate(cid, { name_ru: text });
-    clearAdminState(userId);
-    await botInstance.sendMessage(chatId, "✅ Категория имени (Русский) обновлено.", { reply_markup: REMOVE_REPLY_KEYBOARD });
-    await sendCategoryEditMenu(chatId, userId, cid);
-    return true;
-  }
-
-  if (st.type === 'edit_category_icon') {
-    const url = /^skip$/i.test(text) ? '' : text;
-    if (url && !/^https?:\/\//i.test(url) && text.toLowerCase() !== 'skip') {
-      await botInstance.sendMessage(
-        chatId,
-        "URL http/https bilan boshlanishi kerak yoki 'skip' yozing.",
-        { reply_markup: REMOVE_REPLY_KEYBOARD }
-      );
+    // Parse emoji + name format: "🍕 Пицца" → icon=🍕, name=Пицца
+    const trimmed = text.trim();
+    const emojiRegex = /^[\p{Emoji}]/u;
+    let icon = '';
+    let name = trimmed;
+    
+    if (emojiRegex.test(trimmed)) {
+      const spaceIndex = trimmed.indexOf(' ');
+      if (spaceIndex > 0) {
+        icon = trimmed.substring(0, spaceIndex);
+        name = trimmed.substring(spaceIndex + 1).trim();
+      } else {
+        icon = trimmed;
+        name = '';
+      }
+    }
+    
+    if (!name) {
+      await botInstance.sendMessage(chatId, "Nom bo'sh bo'lmasin. Qayta kiriting.", {
+        reply_markup: REMOVE_REPLY_KEYBOARD,
+      });
       return true;
     }
-    const cid = st.categoryId;
-    await Category.findByIdAndUpdate(cid, { image_url: url });
+    
+    await Category.findByIdAndUpdate(cid, { name_ru: name, image_url: icon });
     clearAdminState(userId);
-    await botInstance.sendMessage(chatId, "✅ Kategoriya iconi yangilandi.", { reply_markup: REMOVE_REPLY_KEYBOARD });
+    await botInstance.sendMessage(chatId, "✅ Категория имени (Русский) обновлено.", { reply_markup: REMOVE_REPLY_KEYBOARD });
     await sendCategoryEditMenu(chatId, userId, cid);
     return true;
   }
@@ -1685,7 +1684,6 @@ async function handleAdminMessage(msg) {
       st.type === 'edit_category' ||
       st.type === 'edit_category_name_uz' ||
       st.type === 'edit_category_name_ru' ||
-      st.type === 'edit_category_icon' ||
       st.type === 'delete_category_pending';
     const kbP2pEdit = st.type === 'edit_p2p_card';
     await botInstance.sendMessage(chatId, "Tushunarsiz buyruq. Inline tugmalar yoki 📦 Katalog orqali davom eting.", {
